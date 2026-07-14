@@ -1,0 +1,1229 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Contractor Management - ระบบจัดการความปลอดภัยผู้รับเหมา</title>
+  <!-- CSS Link -->
+  <link rel="stylesheet" href="style.css">
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- ChartJS for Dashboard Charts -->
+  <script src="libs/chart.js"></script>
+  <!-- QRCodeJS for generating QR codes -->
+  <script src="libs/qrcode.min.js"></script>
+  <!-- SheetJS for exporting Excel -->
+  <script src="libs/xlsx.full.min.js"></script>
+  <!-- HTML5-QRCode Scanner for camera scanning in browsers -->
+  <script src="libs/html5-qrcode.min.js"></script>
+</head>
+<body>
+
+  <div class="app-container">
+    
+    <!-- Sidebar Menu -->
+    <aside class="sidebar" id="sidebar">
+      <div class="brand-section">
+        <img src="รูป mascot/mascot_safety.png" alt="Logo" class="brand-logo">
+        <div>
+          <div class="brand-title">Contractor</div>
+          <div class="brand-subtitle">MANAGEMENT SYSTEM</div>
+        </div>
+      </div>
+      
+      <nav class="nav-menu">
+        <li class="nav-item active" data-target="dashboard-panel">
+          <i class="fa-solid fa-chart-line"></i>
+          <span>แดชบอร์ดภาพรวม</span>
+        </li>
+        <li class="nav-item" data-target="contractor-panel">
+          <i class="fa-solid fa-users"></i>
+          <span>จัดการข้อมูลผู้รับเหมา</span>
+        </li>
+        <li class="nav-item" data-target="equipment-panel">
+          <i class="fa-solid fa-screwdriver-wrench"></i>
+          <span>ขึ้นทะเบียนอุปกรณ์</span>
+        </li>
+        <li class="nav-item" data-target="patrol-panel">
+          <i class="fa-solid fa-shield-halved"></i>
+          <span>เดินตรวจความปลอดภัย</span>
+        </li>
+        <li class="nav-item" data-target="reports-panel">
+          <i class="fa-solid fa-file-invoice"></i>
+          <span>รายงานและสถิติระบบอุปกรณ์/ตรวจสอบความปลอดภัย</span>
+        </li>
+        <li class="nav-item" data-target="training-panel">
+          <i class="fa-solid fa-id-card"></i>
+          <span>สถานะอบรมและ Just ID</span>
+        </li>
+      </nav>
+      
+      <div class="sidebar-footer">
+        <div class="mascot-avatar-container">
+          <img src="รูป mascot/mascot_safety.png" alt="Mascot" class="mascot-avatar">
+        </div>
+        <div>
+          <div class="footer-text">น้องหยดน้ำมัน</div>
+          <div style="font-size: 10px; color: #78909c;">ผู้ช่วยดูแลความปลอดภัย</div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Panel Area -->
+    <main class="main-content">
+      
+      <!-- Top Header Bar -->
+      <div class="header-bar">
+        <button class="menu-toggle" id="menu-toggle">
+          <i class="fa-solid fa-bars"></i>
+        </button>
+        <div class="page-title">
+          <h1 id="panel-title">แดชบอร์ดภาพรวม</h1>
+          <p id="panel-subtitle">สรุปสถิติความปลอดภัยและข้อมูลผู้รับเหมา</p>
+        </div>
+        <button class="btn btn-outline" id="theme-toggle" style="padding: 10px; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; margin-left: auto; margin-right: 16px;" title="เปลี่ยนโหมดมืด/สว่าง">
+          <i class="fa-solid fa-moon"></i>
+        </button>
+        <button class="btn btn-outline" onclick="resetAppCache()" style="padding: 10px; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; margin-right: 16px; border-color: var(--danger-color); color: var(--danger-color);" title="ล้างข้อมูลทดสอบและล้างแคชเครื่อง">
+          <i class="fa-solid fa-trash-can"></i>
+        </button>
+        <!-- Connection Status for Google Sheets -->
+        <div class="connection-status" id="connection-status" style="font-size: 12px; font-weight: 600;">
+          <span style="color: #78909c;"><i class="fa-solid fa-circle-notch fa-spin"></i> กำลังโหลดข้อมูล...</span>
+        </div>
+      </div>
+
+      <!-- ================= PANEL 1: DASHBOARD ================= -->
+      <div class="module-panel active" id="dashboard-panel">
+        <!-- Quick Status Check Card -->
+        <div style="background: var(--white); padding: 20px; border-radius: 12px; box-shadow: var(--shadow); margin-bottom: 24px; border: 1px solid var(--border-color);">
+          <h2 style="font-size: 15px; font-weight: 600; margin-bottom: 12px; color: var(--primary-color); display: flex; align-items: center; gap: 8px; border: none; padding: 0;">
+            <i class="fa-solid fa-magnifying-glass-location"></i> ตรวจสอบสถานะอุปกรณ์ด่วน (ใส่ซีเรียล หรือสแกน QR)
+          </h2>
+          <div style="display: flex; gap: 8px;">
+            <input type="text" class="form-control" id="dashboard-lookup-serial" placeholder="ป้อนหมายเลขซีเรียลอุปกรณ์ เช่น 123456..." style="flex-grow: 1;">
+            <button class="btn btn-primary" onclick="lookupEquipmentStatus(document.getElementById('dashboard-lookup-serial').value)" style="white-space: nowrap;">
+              <i class="fa-solid fa-search"></i> ค้นหา
+            </button>
+            <button class="btn btn-secondary" onclick="startQrScan('dashboard-lookup-serial')" style="padding: 10px; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 8px;" title="เปิดกล้องสแกน QR Code">
+              <i class="fa-solid fa-camera" style="font-size: 16px;"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- KPI Cards Grid -->
+        <div class="badges-grid">
+          <div class="badge-card active-contractors">
+            <div class="badge-icon-container">
+              <i class="fa-solid fa-users"></i>
+            </div>
+            <div class="badge-details">
+              <h3>ผู้รับเหมาทำงานอยู่ (Active)</h3>
+              <div class="badge-value" id="kpi-contractors">0</div>
+            </div>
+          </div>
+          <div class="badge-card passed-eq">
+            <div class="badge-icon-container">
+              <i class="fa-solid fa-circle-check"></i>
+            </div>
+            <div class="badge-details">
+              <h3>อุปกรณ์ที่ผ่านการตรวจ</h3>
+              <div class="badge-value" id="kpi-passed-eq">0</div>
+            </div>
+          </div>
+          <div class="badge-card defective-eq">
+            <div class="badge-icon-container">
+              <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            <div class="badge-details">
+              <h3>อุปกรณ์ชำรุด/หมดอายุ</h3>
+              <div class="badge-value" id="kpi-defective-eq">0</div>
+            </div>
+          </div>
+          <div class="badge-card total-findings">
+            <div class="badge-icon-container">
+              <i class="fa-solid fa-shield-halved"></i>
+            </div>
+            <div class="badge-details">
+              <h3>ข้อบกพร่องจากการเดินตรวจสะสม</h3>
+              <div class="badge-value" id="kpi-total-findings">0</div>
+            </div>
+          </div>
+          <div class="badge-card pending-capa">
+            <div class="badge-icon-container">
+              <i class="fa-solid fa-clock-rotate-left"></i>
+            </div>
+            <div class="badge-details">
+              <h3>รอดำเนินการ (Pending CAPA)</h3>
+              <div class="badge-value" id="kpi-pending-capa">0</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Charts Grid -->
+        <div class="charts-grid">
+          <div class="chart-card">
+            <div class="chart-header">ข้อบกพร่องด้านความปลอดภัยตามบริษัทผู้รับเหมา</div>
+            <div class="chart-container">
+              <canvas id="chart-contractors"></canvas>
+            </div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-header">สัดส่วนความรุนแรง (สูง-กลาง-ต่ำ)</div>
+            <div class="chart-container">
+              <canvas id="chart-severity"></canvas>
+            </div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-header">ข้อบกพร่องตามพื้นที่ปฏิบัติงาน</div>
+            <div class="chart-container">
+              <canvas id="chart-zones"></canvas>
+            </div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-header">สถิติผลตรวจผ่านเกณฑ์อุปกรณ์ & PPE (ชิ้น)</div>
+            <div class="chart-container">
+              <canvas id="chart-audits"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= PANEL 2: CONTRACTOR MANAGEMENT ================= -->
+      <div class="module-panel" id="contractor-panel">
+        <div class="panel-actions">
+          <div class="search-box">
+            <i class="fa-solid fa-magnifying-glass" style="color: #78909c;"></i>
+            <input type="text" placeholder="ค้นหาชื่อบริษัทหรือพื้นที่..." id="contractor-search">
+          </div>
+          <button class="btn btn-primary" onclick="openModal('add-contractor-modal')">
+            <i class="fa-solid fa-user-plus"></i> เพิ่มผู้รับเหมา
+          </button>
+        </div>
+
+        <div class="table-container mobile-card-view">
+          <table>
+            <thead>
+              <tr>
+                <th>ชื่อบริษัท</th>
+                <th>สถานะ</th>
+                <th style="width: 100px;">การจัดการ</th>
+              </tr>
+            </thead>
+            <tbody id="contractor-table-body">
+              <!-- Rendered via JS -->
+            </tbody>
+          </table>
+          <div class="mobile-cards" id="contractor-mobile-cards"></div>
+        </div>
+      </div>
+
+      <!-- ================= PANEL 3: EQUIPMENT MANAGEMENT ================= -->
+      <div class="module-panel" id="equipment-panel">
+        <!-- แท็บย่อยฝั่งอุปกรณ์ -->
+        <div class="tab-container" style="margin-bottom: 20px;">
+          <button class="tab-button active" id="btn-eq-registered" onclick="switchEqTab('eq-registered-view')">
+            <i class="fa-solid fa-list-check"></i> อุปกรณ์ที่ผ่านการตรวจ
+          </button>
+          <button class="tab-button" id="btn-eq-audit" onclick="switchEqTab('eq-daily-audit-view')">
+            <i class="fa-solid fa-chart-simple"></i> สถิติส่งตรวจอุปกรณ์รายวัน (Daily Audit)
+          </button>
+          <button class="tab-button" id="btn-eq-ppe" onclick="switchEqTab('eq-ppe-view')">
+            <i class="fa-solid fa-shield-halved"></i> ตรวจสอบและขึ้นทะเบียน PPE
+          </button>
+        </div>
+
+        <!-- วิว 1: ตารางอุปกรณ์ -->
+        <div id="eq-registered-view" class="eq-tab-view">
+          <div class="panel-actions">
+            <div class="search-box">
+              <i class="fa-solid fa-magnifying-glass" style="color: #78909c;"></i>
+              <input type="text" placeholder="ค้นหาอุปกรณ์, ซีเรียล..." id="equipment-search">
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn btn-outline" id="btn-bulk-print" onclick="bulkPrintSelectedTags()" style="display: none; border-color: var(--success-color); color: var(--success-color); padding: 10px 16px;">
+                <i class="fa-solid fa-print"></i> พิมพ์ป้ายที่เลือก (Bulk Print)
+              </button>
+              <button class="btn btn-primary" onclick="openModal('add-equipment-modal')">
+                <i class="fa-solid fa-circle-plus"></i> ขึ้นทะเบียนอุปกรณ์
+              </button>
+            </div>
+          </div>
+
+          <div class="table-container mobile-card-view">
+            <table>
+              <thead>
+                <tr>
+                  <th style="width: 40px; text-align: center;">
+                    <input type="checkbox" id="check-all-eq" onchange="toggleAllEqCheckboxes(this)">
+                  </th>
+                  <th>ชื่ออุปกรณ์</th>
+                  <th>หมายเลขซีเรียล</th>
+                  <th>บริษัทผู้รับเหมา</th>
+                  <th>วันที่ตรวจสอบ</th>
+                  <th>วันหมดอายุ Tag</th>
+                  <th>สีป้ายประจำเดือน</th>
+                  <th style="width: 120px;">การจัดการ</th>
+                </tr>
+              </thead>
+              <tbody id="equipment-table-body">
+                <!-- Rendered via JS -->
+              </tbody>
+            </table>
+            <div class="mobile-cards" id="equipment-mobile-cards"></div>
+          </div>
+        </div>
+
+        <!-- วิว 2: สถิติการตรวจรับอุปกรณ์รายวัน -->
+        <div id="eq-daily-audit-view" class="eq-tab-view" style="display: none;">
+          <div class="panel-actions">
+            <div class="search-box">
+              <i class="fa-solid fa-magnifying-glass" style="color: #78909c;"></i>
+              <input type="text" placeholder="ค้นหาสถิติส่งตรวจ..." id="audit-search">
+            </div>
+            <button class="btn btn-primary" onclick="openModal('add-daily-audit-modal')">
+              <i class="fa-solid fa-plus"></i> บันทึกยอดการส่งตรวจรายวัน
+            </button>
+          </div>
+
+          <div class="table-container mobile-card-view">
+            <table>
+              <thead>
+                <tr>
+                  <th>วันที่</th>
+                  <th>บริษัทผู้รับเหมา</th>
+                  <th>จำนวนส่งตรวจทั้งหมด</th>
+                  <th>ผ่านการตรวจ (ชิ้น)</th>
+                  <th>ไม่ผ่าน (ชิ้น)</th>
+                  <th>อัตราการผ่านตรวจ (Pass Rate)</th>
+                  <th>สาเหตุที่ไม่ผ่าน / หมายเหตุ</th>
+                </tr>
+              </thead>
+              <tbody id="audit-table-body">
+                <!-- Rendered via JS -->
+              </tbody>
+            </table>
+            <div class="mobile-cards" id="audit-mobile-cards"></div>
+          </div>
+        </div>
+
+        <!-- วิว 3: การตรวจสอบและขึ้นทะเบียน PPE แบบรวมยอด -->
+        <div id="eq-ppe-view" class="eq-tab-view" style="display: none;">
+          <div class="panel-actions">
+            <div class="search-box">
+              <i class="fa-solid fa-magnifying-glass" style="color: #78909c;"></i>
+              <input type="text" placeholder="ค้นหาประวัติตรวจ PPE..." id="ppe-search">
+            </div>
+            <button class="btn btn-primary" onclick="openModal('add-ppe-audit-modal')">
+              <i class="fa-solid fa-circle-plus"></i> บันทึกการตรวจสอบ PPE
+            </button>
+          </div>
+
+          <div class="table-container mobile-card-view">
+            <table>
+              <thead>
+                <tr>
+                  <th style="width: 40px; text-align: center;">
+                    <input type="checkbox" id="check-all-ppe" onchange="toggleAllPpeCheckboxes(this)">
+                  </th>
+                  <th>วันที่ตรวจ</th>
+                  <th>บริษัทผู้รับเหมา</th>
+                  <th>ประเภทอุปกรณ์ PPE</th>
+                  <th>จำนวนนำตรวจทั้งหมด</th>
+                  <th>ผ่านการตรวจ (ชิ้น)</th>
+                  <th>ไม่ผ่าน (ชิ้น)</th>
+                  <th>อัตราผ่าน (Pass Rate)</th>
+                  <th>หมายเหตุ / สาเหตุ</th>
+                  <th style="width: 100px;">การจัดการ</th>
+                </tr>
+              </thead>
+              <tbody id="ppe-table-body">
+                <!-- Rendered via JS -->
+              </tbody>
+            </table>
+            <div class="mobile-cards" id="ppe-mobile-cards"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ================= PANEL 4: SAFETY PATROL ================= -->
+      <div class="module-panel" id="patrol-panel">
+        <div class="panel-actions">
+          <div class="search-box">
+            <i class="fa-solid fa-magnifying-glass" style="color: #78909c;"></i>
+            <input type="text" placeholder="ค้นหาประวัติการเดินตรวจ..." id="patrol-search">
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button class="btn btn-outline" onclick="sendPatrolDigest()" style="color: var(--primary-color); border-color: var(--primary-color); padding: 10px 16px;" title="รวบรวมข้อบกพร่องที่ยังไม่ได้ส่ง ส่งรายงานสรุปแยกตามพื้นที่">
+              <i class="fa-solid fa-paper-plane"></i> ส่งสรุปรายงานความปลอดภัย
+            </button>
+            <button class="btn btn-primary" onclick="openModal('add-patrol-modal')">
+              <i class="fa-solid fa-shield-halved"></i> บันทึกเดินตรวจความปลอดภัย
+            </button>
+          </div>
+        </div>
+
+        <div class="table-container mobile-card-view">
+          <table>
+            <thead>
+              <tr>
+                <th>วันที่ตรวจ</th>
+                <th>บริษัทผู้รับเหมา</th>
+                <th>พื้นที่ปฏิบัติงาน</th>
+                <th>ประเภทข้อบกพร่อง</th>
+                <th>ความรุนแรง</th>
+                <th>ภาพถ่าย (Before/After)</th>
+                <th>สถานะ CAPA</th>
+                <th style="width: 100px;">จัดการเคส</th>
+              </tr>
+            </thead>
+            <tbody id="patrol-table-body">
+              <!-- Rendered via JS -->
+            </tbody>
+          </table>
+          <div class="mobile-cards" id="patrol-mobile-cards"></div>
+        </div>
+      </div>
+
+      <!-- ================= PANEL 5: REPORTS & STATISTICS ================= -->
+      <div class="module-panel" id="reports-panel">
+        <!-- Filter Panel -->
+        <div class="report-filter-panel">
+          <h2 style="font-size: 15px; font-weight: 600; margin-bottom: 16px;">ตัวกรองค้นหาข้อมูลและส่งออกรายงาน</h2>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="filter-report-type">ประเภทรายงาน</label>
+              <select class="form-control" id="filter-report-type">
+                <option value="evaluation">รายงานสรุปคะแนนความประพฤติผู้รับเหมา (CAR Summary)</option>
+                <option value="equipment">รายงานตรวจสอบอุปกรณ์ผู้รับเหมาทั้งหมด</option>
+                <option value="patrol">รายงานรายละเอียดการเดินตรวจความปลอดภัย</option>
+                <option value="audit">รายงานยอดส่งตรวจอุปกรณ์รายวัน (Daily Audit)</option>
+                <option value="ppe">รายงานตรวจสอบและขึ้นทะเบียน PPE ผู้รับเหมา</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="filter-date-start">วันที่เริ่มต้น</label>
+              <input type="date" class="form-control" id="filter-date-start">
+            </div>
+            <div class="form-group">
+              <label for="filter-date-end">วันที่สิ้นสุด</label>
+              <input type="date" class="form-control" id="filter-date-end">
+            </div>
+          </div>
+          <div class="form-row" style="margin-top: 8px;">
+            <div class="form-group">
+              <label for="filter-contractor">บริษัทผู้รับเหมา</label>
+              <select class="form-control" id="filter-contractor">
+                <option value="">-- ทั้งหมด --</option>
+                <!-- Rendered via JS -->
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="filter-dept">แผนกที่รับผิดชอบ</label>
+              <select class="form-control" id="filter-dept">
+                <option value="">-- ทั้งหมด --</option>
+                <!-- Rendered via JS -->
+              </select>
+            </div>
+            <div class="form-group" style="display: flex; align-items: flex-end; justify-content: flex-end; gap: 8px;">
+              <button class="btn btn-outline" id="btn-search-report" onclick="generateReportPreview()">
+                <i class="fa-solid fa-magnifying-glass"></i> ค้นหา
+              </button>
+              <button class="btn btn-secondary" id="btn-export-excel" onclick="exportReportToExcel()">
+                <i class="fa-solid fa-file-excel"></i> ส่งออก Excel
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Preview Report Table -->
+        <h3 style="font-size: 14px; font-weight: 600; margin-bottom: 12px; color: #546e7a;" id="report-title-preview">ตัวอย่างตารางรายงาน: รายงานสรุปคะแนนประเมินผู้รับเหมา</h3>
+        <div class="table-container" style="overflow-x: auto;">
+          <table id="report-preview-table">
+            <thead id="report-preview-thead">
+              <!-- Dynamic Headers -->
+            </thead>
+            <tbody id="report-preview-tbody">
+              <!-- Dynamic Rows -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ================= PANEL 6: TRAINING & JUST ID ================= -->
+      <div class="module-panel" id="training-panel">
+        
+        <!-- Tab Bar -->
+        <div class="tab-container">
+          <button class="tab-button active" onclick="switchTrainingTab('executive')">
+            <i class="fa-solid fa-chart-pie"></i> มุมมองผู้บริหาร (Executive View)
+          </button>
+          <button class="tab-button" onclick="switchTrainingTab('operation')">
+            <i class="fa-solid fa-list-check"></i> มุมมองการทำงาน (Operation View)
+          </button>
+        </div>
+
+        <!-- Tab 1: Executive View -->
+        <div class="training-tab-content active" id="training-exec-view">
+          <div class="badges-grid" style="margin-bottom: 24px;">
+            <div class="badge-card active-contractors" style="border-left-color: var(--primary-color);">
+              <div class="badge-icon-container" style="background-color: var(--primary-light); color: var(--primary-color);">
+                <i class="fa-solid fa-users"></i>
+              </div>
+              <div class="badge-details">
+                <h3>ผู้รับเหมาอบรมทั้งหมด</h3>
+                <div class="badge-value" id="t-kpi-total">0</div>
+                <span style="font-size: 11px; color: #78909c;">ลงทะเบียนอบรมสะสม</span>
+              </div>
+            </div>
+            <div class="badge-card passed-eq" style="border-left-color: var(--success-color);">
+              <div class="badge-icon-container" style="background-color: #e8f5e9; color: var(--success-color);">
+                <i class="fa-solid fa-circle-check"></i>
+              </div>
+              <div class="badge-details">
+                <h3>อนุมัติบัตร Just ID แล้ว</h3>
+                <div class="badge-value" id="t-kpi-approved" style="color: var(--success-color);">0</div>
+                <span style="font-size: 11px; color: #78909c;" id="t-kpi-approved-pct">0% ของทั้งหมด</span>
+              </div>
+            </div>
+            <div class="badge-card warning-eq" style="border-left-color: var(--warning-color);">
+              <div class="badge-icon-container" style="background-color: #fff3e0; color: var(--warning-color);">
+                <i class="fa-solid fa-clock"></i>
+              </div>
+              <div class="badge-details">
+                <h3>รอตรวจสอบเอกสาร</h3>
+                <div class="badge-value" id="t-kpi-pending" style="color: var(--warning-color);">0</div>
+                <span style="font-size: 11px; color: #78909c;" id="t-kpi-pending-pct">0% ของทั้งหมด</span>
+              </div>
+            </div>
+            <div class="badge-card expired-eq" style="border-left-color: var(--danger-color);">
+              <div class="badge-icon-container" style="background-color: #ffebee; color: var(--danger-color);">
+                <i class="fa-solid fa-circle-xmark"></i>
+              </div>
+              <div class="badge-details">
+                <h3>เอกสารไม่ผ่าน (Reject)</h3>
+                <div class="badge-value" id="t-kpi-rejected" style="color: var(--danger-color);">0</div>
+                <span style="font-size: 11px; color: #78909c;" id="t-kpi-rejected-pct">0% ของทั้งหมด</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="charts-grid">
+            <div class="chart-card">
+              <div class="chart-header">
+                <h2>สัดส่วนผู้รับเหมาแยกตาม "หลักสูตรอบรม"</h2>
+              </div>
+              <div class="chart-body" style="height: 300px; display: flex; align-items: center; justify-content: center; position: relative;">
+                <canvas id="training-course-chart"></canvas>
+              </div>
+            </div>
+            <div class="chart-card">
+              <div class="chart-header">
+                <h2>Top 5 บริษัทที่มีผู้เข้ารับการอบรมสูงสุด</h2>
+              </div>
+              <div class="chart-body" style="padding: 24px; display: flex; flex-direction: column; gap: 14px;" id="training-top-companies">
+                <!-- Dynamic list -->
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 2: Operation View -->
+        <div class="training-tab-content" id="training-oper-view" style="display: none;">
+          <!-- Filter Panel -->
+          <div class="report-filter-panel" style="margin-bottom: 20px;">
+            <div class="form-row" style="align-items: center;">
+              <!-- Quick Filter Buttons -->
+              <div class="form-group" style="flex: 2;">
+                <label>ตัวกรองด่วน</label>
+                <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                  <button class="btn btn-primary" id="btn-t-filter-all" onclick="setTrainingQuickFilter('all')">ดูทั้งหมด</button>
+                  <button class="btn btn-outline" id="btn-t-filter-pending" onclick="setTrainingQuickFilter('pending')">📌 รอตรวจสอบเอกสาร</button>
+                  <button class="btn btn-outline" id="btn-t-filter-rejected" onclick="setTrainingQuickFilter('rejected')">❌ แสดงเฉพาะไม่ผ่าน (Reject)</button>
+                </div>
+              </div>
+              <!-- Live Search Box -->
+              <div class="form-group" style="flex: 2;">
+                <label for="training-search-input">ค้นหาด่วน</label>
+                <div class="search-box">
+                  <i class="fa-solid fa-magnifying-glass"></i>
+                  <input type="text" id="training-search-input" placeholder="ค้นหา เลขบัตรประชาชน, ชื่อ, บริษัท..." oninput="handleTrainingSearch()">
+                </div>
+              </div>
+              <!-- CSV Exporter -->
+              <div class="form-group" style="flex: 0; min-width: 130px; display: flex; align-items: flex-end;">
+                <button class="btn btn-secondary" onclick="exportTrainingToCSV()" style="width: 100%; height: 38px;">
+                  <i class="fa-solid fa-file-csv"></i> Export CSV
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Table Container -->
+          <div class="table-container mobile-card-view" style="overflow-x: auto;">
+            <table>
+              <thead>
+                <tr>
+                  <th onclick="handleTrainingSort('timestamp')" style="cursor: pointer; user-select: none;">
+                    วันที่/เวลาอบรม <span id="sort-t-icon-timestamp"><i class="fa-solid fa-sort"></i></span>
+                  </th>
+                  <th onclick="handleTrainingSort('idCard')" style="cursor: pointer; user-select: none;">
+                    เลขบัตรประชาชน <span id="sort-t-icon-idCard"><i class="fa-solid fa-sort"></i></span>
+                  </th>
+                  <th onclick="handleTrainingSort('name')" style="cursor: pointer; user-select: none;">
+                    ชื่อ-นามสกุล <span id="sort-t-icon-name"><i class="fa-solid fa-sort"></i></span>
+                  </th>
+                  <th onclick="handleTrainingSort('company')" style="cursor: pointer; user-select: none;">
+                    บริษัท <span id="sort-t-icon-company"><i class="fa-solid fa-sort"></i></span>
+                  </th>
+                  <th onclick="handleTrainingSort('course')" style="cursor: pointer; user-select: none;">
+                    หลักสูตร <span id="sort-t-icon-course"><i class="fa-solid fa-sort"></i></span>
+                  </th>
+                  <th onclick="handleTrainingSort('scoreStatus')" style="cursor: pointer; user-select: none; text-align: center;">
+                    สถานะคะแนน <span id="sort-t-icon-scoreStatus"><i class="fa-solid fa-sort"></i></span>
+                  </th>
+                  <th onclick="handleTrainingSort('docStatus')" style="cursor: pointer; user-select: none; text-align: center;">
+                    สถานะตรวจเอกสาร <span id="sort-t-icon-docStatus"><i class="fa-solid fa-sort"></i></span>
+                  </th>
+                  <th onclick="handleTrainingSort('justIdStatus')" style="cursor: pointer; user-select: none; text-align: center;">
+                    สถานะ Just ID <span id="sort-t-icon-justIdStatus"><i class="fa-solid fa-sort"></i></span>
+                  </th>
+                  <th onclick="handleTrainingSort('justIdNo')" style="cursor: pointer; user-select: none;">
+                    เลข Just ID <span id="sort-t-icon-justIdNo"><i class="fa-solid fa-sort"></i></span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody id="training-table-body">
+                <!-- Rows injected dynamically -->
+              </tbody>
+            </table>
+            <div class="mobile-cards" id="training-mobile-cards"></div>
+            <div id="training-table-empty" style="display: none; text-align: center; padding: 32px; color: #78909c;">
+              <i class="fa-solid fa-triangle-exclamation" style="font-size: 32px; margin-bottom: 12px;"></i>
+              <p>ไม่พบข้อมูลผู้รับเหมาเข้ารับการอบรมตามเงื่อนไขการกรอง</p>
+            </div>
+          </div>
+
+          <!-- Pagination -->
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px; flex-wrap: wrap; gap: 12px; font-size: 13px; color: #546e7a;">
+            <div>
+              <span id="training-pagination-info">แสดง 0 ถึง 0 จาก 0 รายการ</span>
+              <span style="margin-left: 12px;">แสดงแถวละ:</span>
+              <select id="training-page-size" onchange="changeTrainingPageSize()" style="padding: 4px 8px; border-radius: 4px; border: 1px solid var(--border-color); background: var(--white); color: var(--dark-color); font-weight: 600;">
+                <option value="10" selected>10</option>
+                <option value="25">25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+              </select>
+            </div>
+            <div style="display: flex; gap: 4px;" id="training-pagination-controls">
+              <!-- Dynamic page links -->
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </main>
+  </div>
+
+  <!-- ==================== MODALS ==================== -->
+  
+  <!-- Add/Edit Contractor Modal -->
+  <div class="modal" id="add-contractor-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 id="contractor-modal-title">เพิ่มผู้รับเหมาใหม่</h2>
+        <button class="close-modal" onclick="closeModal('add-contractor-modal')">&times;</button>
+      </div>
+      <form id="contractor-form" onsubmit="saveContractor(event)">
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="c-company-name">ชื่อบริษัทผู้รับเหมา</label>
+            <input type="text" class="form-control" id="c-company-name" required placeholder="เช่น บริษัท สหการช่าง จำกัด">
+          </div>
+          <!-- ซ่อนช่องเหล่านี้เพื่อลดความซับซ้อนตามระบบใหม่ แต่ยังส่งค่าเพื่อความเข้ากันได้ย้อนหลัง -->
+          <div style="display: none;">
+            <input type="text" id="c-area" value="-">
+            <input type="text" id="c-supervisor" value="-">
+            <input type="email" id="c-email" value="info@company.com">
+          </div>
+          <div class="form-group" id="c-status-group" style="display: none;">
+            <label for="c-status">สถานะ</label>
+            <select class="form-control" id="c-status">
+              <option value="ใช้งานอยู่">ใช้งานอยู่</option>
+              <option value="ปิดใช้งาน">ปิดใช้งาน</option>
+            </select>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" onclick="closeModal('add-contractor-modal')">ยกเลิก</button>
+          <button type="submit" class="btn btn-primary">บันทึกข้อมูล</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Add/Edit Equipment Modal -->
+  <div class="modal" id="add-equipment-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>ขึ้นทะเบียนตรวจสอบอุปกรณ์</h2>
+        <button class="close-modal" onclick="closeModal('add-equipment-modal')">&times;</button>
+      </div>
+      <form id="equipment-form" onsubmit="saveEquipment(event)">
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="eq-name">ชื่ออุปกรณ์</label>
+            <select class="form-control" id="eq-name" required>
+              <!-- Rendered dynamically -->
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="eq-serial">หมายเลขซีเรียล (Serial Number)</label>
+            <input type="text" class="form-control" id="eq-serial" required placeholder="เช่น SN-987456">
+          </div>
+          <div class="form-group">
+            <label for="eq-contractor">บริษัทผู้รับเหมา (เฉพาะที่ยังใช้งานอยู่)</label>
+            <select class="form-control" id="eq-contractor" required>
+              <!-- Dynamic active contractors -->
+            </select>
+          </div>
+          <!-- ซ่อน แผนก/พื้นที่ใช้งาน ตามระบบใหม่เพื่อให้ขึ้นทะเบียนได้รวดเร็วขึ้น -->
+          <div style="display: none;">
+            <select class="form-control" id="eq-area">
+              <option value="-" selected>-</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="eq-date">วันที่ตรวจสอบ</label>
+              <input type="date" class="form-control" id="eq-date" required onchange="calculateExpiry()">
+            </div>
+            <div class="form-group">
+              <label for="eq-expiry">วันหมดอายุ Tag</label>
+              <input type="date" class="form-control" id="eq-expiry" required readonly>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>สีป้ายประจำเดือน (Auto): <strong id="eq-color-name">-</strong></label>
+            <div style="display: flex; align-items: center; margin-top: 8px;">
+              <span id="eq-color-dot" class="color-dot" style="width: 24px; height: 24px; border: 1px solid #ddd;"></span>
+              <span style="font-size: 13px; color: #546e7a; margin-left: 8px;">อิงตามเดือนของวันที่ตรวจสอบ</span>
+            </div>
+          </div>
+          <div class="form-group" style="margin-top: 12px;">
+            <label>รูปภาพอุปกรณ์ขณะตรวจสอบผ่าน (Photo)</label>
+            <div class="image-upload-area" onclick="triggerFileInput('eq-image-file')">
+              <i class="fa-solid fa-camera" style="font-size: 32px; color: #78909c; margin-bottom: 8px;"></i>
+              <p style="font-size: 13px; color: #546e7a;">คลิกเพื่อถ่ายภาพ หรืออัปโหลดรูปอุปกรณ์</p>
+              <input type="file" id="eq-image-file" accept="image/*" style="display: none;" onchange="handleImageUpload(event, 'eq-preview', 'eq-base64')">
+              <input type="hidden" id="eq-base64">
+              <img id="eq-preview" class="image-preview" alt="Equipment Preview Image" style="display: none;">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" onclick="closeModal('add-equipment-modal')">ยกเลิก</button>
+          <button type="submit" class="btn btn-primary">บันทึกและขึ้นทะเบียน</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Add Safety Patrol Finding Modal -->
+  <div class="modal" id="add-patrol-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>บันทึกข้อบกพร่องความปลอดภัย</h2>
+        <button class="close-modal" onclick="closeModal('add-patrol-modal')">&times;</button>
+      </div>
+      <form id="patrol-form" onsubmit="savePatrol(event)">
+        <div class="modal-body">
+          <div class="form-row">
+            <div class="form-group">
+              <label for="p-date">วันที่ตรวจพบ</label>
+              <input type="date" class="form-control" id="p-date" required>
+            </div>
+            <div class="form-group">
+              <label for="p-inspector">จป. ผู้ตรวจบันทึก</label>
+              <select class="form-control" id="p-inspector" required>
+                <option value="">-- เลือก จป. ผู้ตรวจ --</option>
+              </select>
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label for="p-contractor">บริษัทผู้รับเหมาผู้รับผิดชอบ</label>
+            <select class="form-control" id="p-contractor" required>
+              <option value="">-- เลือกบริษัทผู้รับเหมา --</option>
+              <!-- Dynamic contractors -->
+            </select>
+          </div>
+          
+          <div class="form-group">
+            <label for="p-dept">แผนกที่รับผิดชอบ</label>
+            <select class="form-control" id="p-dept" required onchange="updatePatrolResponsibleInfo()">
+              <option value="">-- เลือกแผนกที่รับผิดชอบ --</option>
+            </select>
+          </div>
+          
+          <div class="form-group">
+            <label for="p-area">พื้นที่ปฏิบัติงานที่พบข้อบกพร่อง</label>
+            <input type="text" class="form-control" id="p-area" required placeholder="ระบุจุดเกิดเหตุให้ละเอียด เช่น ข้างหม้อต้มน้ำร้อน ชั้น 2">
+            <!-- กล่องแสดงรายชื่อและอีเมลผู้รับผิดชอบเมื่อเลือกพื้นที่ -->
+            <div id="p-responsible-info" style="margin-top: 8px; font-size: 12px; background-color: var(--light-bg); border: 1px solid var(--border-color); padding: 10px; border-radius: 6px; display: none; line-height: 1.6;">
+              <div><strong>แผนกที่รับผิดชอบ:</strong> <span id="p-info-dept" style="font-weight: 600; color: var(--primary-color);">-</span></div>
+              <div><strong>เจ้าของพื้นที่ (Area Owner):</strong> <span id="p-info-owner" style="font-weight: 600;">-</span> (<span id="p-info-owner-email">-</span>)</div>
+              <div><strong>ผู้ควบคุมโครงการ:</strong> <span id="p-info-proj" style="font-weight: 600;">-</span> (<span id="p-info-proj-email">-</span>)</div>
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label for="p-project-supervisor">ผู้ควบคุมงานโครงการ (Project Supervisor)</label>
+            <select class="form-control" id="p-project-supervisor">
+              <option value="">-- เลือกผู้ควบคุมงานโครงการ (ไม่บังคับ) --</option>
+            </select>
+          </div>
+          
+          <div class="form-group">
+            <label for="p-qr-scan">ผูกกับอุปกรณ์ (ระบุซีเรียล หรือสแกน QR - ไม่บังคับ)</label>
+            <div style="display: flex; gap: 8px;">
+              <input type="text" class="form-control" id="p-qr-scan" placeholder="ป้อนหมายเลขซีเรียลอุปกรณ์" style="flex-grow: 1;">
+              <button type="button" class="btn btn-secondary" onclick="startQrScan('p-qr-scan')" style="padding: 10px; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 8px;" title="เปิดกล้องสแกน QR Code">
+                <i class="fa-solid fa-camera" style="font-size: 16px;"></i>
+              </button>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="p-defect">ประเภทข้อบกพร่องความปลอดภัย</label>
+            <select class="form-control" id="p-defect" required>
+              <!-- Dynamic safety defects list -->
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="p-severity">ระดับความรุนแรง</label>
+            <select class="form-control" id="p-severity" required>
+              <option value="ต่ำ">🟢 ต่ำ (Minor Violation)</option>
+              <option value="กลาง">🟡 กลาง (Moderate Danger)</option>
+              <option value="สูง">🔴 สูง (Immediate Danger - Critical)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>รูปภาพข้อบกพร่องหน้างาน (Before)</label>
+            <div class="image-upload-area" onclick="triggerFileInput('p-before-image-file')">
+              <i class="fa-solid fa-camera" style="font-size: 32px; color: #78909c; margin-bottom: 8px;"></i>
+              <p style="font-size: 13px; color: #546e7a;">คลิกเพื่อถ่ายภาพ หรืออัปโหลดรูป</p>
+              <input type="file" id="p-before-image-file" accept="image/*" style="display: none;" onchange="handleImageUpload(event, 'p-before-preview', 'p-before-base64')">
+              <input type="hidden" id="p-before-base64">
+              <img id="p-before-preview" class="image-preview" alt="Preview Image">
+            </div>
+          </div>
+          <div class="switch-group">
+            <label for="p-capa-toggle">
+              <strong style="font-size: 14px;">เปิดเคส CAPA (ติดตามเคสที่คงค้าง)</strong>
+              <p style="font-size: 11px; color: #78909c; margin-top: 2px;">เมื่อต้องการให้ทีมงานตรวจสอบความปลอดภัยติดตามแก้ไขเคสนี้</p>
+            </label>
+            <label class="switch">
+              <input type="checkbox" id="p-capa-toggle" checked>
+              <span class="slider"></span>
+            </label>
+          </div>
+          <div class="form-group">
+            <label for="p-details">รายละเอียดเพิ่มเติม</label>
+            <textarea class="form-control" id="p-details" rows="3" placeholder="ระบุการปฏิบัติงาน หรือจุดแก้ไขเพิ่มเติม..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" onclick="closeModal('add-patrol-modal')">ยกเลิก</button>
+          <button type="submit" class="btn btn-primary">บันทึกข้อมูล</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+
+
+  <!-- View Contractor Profile Modal (History) -->
+  <div class="modal" id="view-contractor-modal">
+    <div class="modal-content" style="width: 700px; max-width: 95%;">
+      <div class="modal-header">
+        <h2 id="vc-company-name">ประวัติข้อมูลผู้รับเหมา</h2>
+        <button class="close-modal" onclick="closeModal('view-contractor-modal')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div style="background-color: var(--light-bg); padding: 16px; border-radius: 8px; margin-bottom: 20px; display: flex; flex-direction: column; gap: 6px;">
+          <div><strong>ผู้ควบคุมงาน:</strong> <span id="vc-supervisor">-</span></div>
+          <div><strong>Email:</strong> <span id="vc-email">-</span></div>
+          <div><strong>พื้นที่อนุญาตทำงาน:</strong> <span id="vc-allowed-areas">-</span></div>
+          <div><strong>สถานะปัจจุบัน:</strong> <span id="vc-status" class="status-badge active">ใช้งานอยู่</span></div>
+        </div>
+        
+        <h3 style="font-size: 14px; font-weight: 600; margin-bottom: 10px; color: var(--primary-color);">อุปกรณ์ที่นำเข้าและผ่านการตรวจ</h3>
+        <div class="table-container" style="max-height: 150px; overflow-y: auto;">
+          <table style="min-width: 100%;">
+            <thead>
+              <tr>
+                <th>ชื่ออุปกรณ์</th>
+                <th>ซีเรียล</th>
+                <th>หมดอายุ Tag</th>
+                <th>สีป้าย</th>
+              </tr>
+            </thead>
+            <tbody id="vc-equipment-list">
+              <!-- Rendered via JS -->
+            </tbody>
+          </table>
+        </div>
+        
+        <h3 style="font-size: 14px; font-weight: 600; margin-top: 20px; margin-bottom: 10px; color: var(--danger-color);">ประวัติข้อบกพร่องด้านความปลอดภัยสะสม</h3>
+        <div class="table-container" style="max-height: 200px; overflow-y: auto;">
+          <table style="min-width: 100%;">
+            <thead>
+              <tr>
+                <th>วันที่ตรวจ</th>
+                <th>พื้นที่เกิดเหตุ</th>
+                <th>หัวข้อข้อบกพร่อง</th>
+                <th>ความรุนแรง</th>
+                <th>สถานะ CAPA</th>
+              </tr>
+            </thead>
+            <tbody id="vc-patrol-list">
+              <!-- Rendered via JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" onclick="closeModal('view-contractor-modal')">ปิดหน้าต่าง</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CAPA Action Modal (Solve & Close Case) -->
+  <div class="modal" id="capa-action-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>อัปเดตงานแก้ไขความปลอดภัย (CAPA Action)</h2>
+        <button class="close-modal" onclick="closeModal('capa-action-modal')">&times;</button>
+      </div>
+      <form id="capa-form" onsubmit="submitCapaResolution(event)">
+        <input type="hidden" id="capa-log-id">
+        <div class="modal-body">
+          <div style="background-color: #fffde7; padding: 16px; border-radius: 8px; border: 1px solid #ffe082; margin-bottom: 16px; line-height: 1.5; font-size: 13px;">
+            <div><strong>ผู้รับเหมา:</strong> <span id="capa-info-contractor">-</span></div>
+            <div><strong>แผนก/พื้นที่:</strong> <span id="capa-info-area">-</span></div>
+            <div><strong>ข้อบกพร่อง:</strong> <span id="capa-info-defect">-</span></div>
+            <div style="margin-top: 8px;" id="capa-before-img-container">
+              <strong>ภาพขณะเกิดข้อบกพร่อง (Before):</strong><br>
+              <img id="capa-before-thumb" src="" alt="Before image" style="width: 120px; height: 90px; object-fit: cover; border-radius: 4px; margin-top: 4px; border: 1px solid #ddd; cursor: pointer;">
+            </div>
+          </div>
+          
+          <div class="form-group">
+            <label>รูปภาพผลการแก้ไขเสร็จสิ้น (After)</label>
+            <div class="image-upload-area" onclick="triggerFileInput('p-after-image-file')">
+              <i class="fa-solid fa-camera-retro" style="font-size: 32px; color: #78909c; margin-bottom: 8px;"></i>
+              <p style="font-size: 13px; color: #546e7a;">ถ่ายภาพสดการแก้ไข หรืออัปโหลดรูป</p>
+              <input type="file" id="p-after-image-file" accept="image/*" style="display: none;" onchange="handleImageUpload(event, 'p-after-preview', 'p-after-base64')">
+              <input type="hidden" id="p-after-base64">
+              <img id="p-after-preview" class="image-preview" alt="After Preview Image">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" onclick="closeModal('capa-action-modal')">ยกเลิก</button>
+          <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check"></i> ยืนยันการแก้ไขและปิดเคส</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Image Lightbox Modal -->
+  <div class="modal" id="image-lightbox-modal" onclick="closeModal('image-lightbox-modal')" style="background-color: rgba(0,0,0,0.85); z-index: 300;">
+    <div style="position: relative; max-width: 90vw; max-height: 90vh; display: flex; align-items: center; justify-content: center;">
+      <img id="lightbox-img" src="" alt="Enlarged safety photo" style="max-width: 100%; max-height: 85vh; border-radius: 4px; box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
+      <button style="position: absolute; top: -32px; right: 0; background: none; border: none; color: #fff; font-size: 24px; cursor: pointer;">&times;</button>
+    </div>
+  </div>
+
+  <!-- ==================== HIDDEN PRINT LAYOUT CONTAINER ==================== -->
+  <div id="print-tag-container">
+    <div class="sticker-wrapper" style="border: 1mm solid #000000; position: relative;">
+      <!-- ID อุปกรณ์แสดงมุมขวาบนของป้ายสติกเกอร์ -->
+      <div style="position: absolute; top: 1mm; right: 2mm; font-size: 7.5px; font-weight: 700; color: #555;" id="print-eq-id">EQ-XXXXX</div>
+      
+      <div class="sticker-header">
+        <img src="รูป mascot/mascot_safety.png" alt="Mascot" class="sticker-mascot">
+        <div class="sticker-header-text">
+          <div class="sticker-title">ป้ายผ่านการตรวจความปลอดภัยอุปกรณ์</div>
+          <div class="sticker-subtitle">CONTRACTOR EQUIPMENT TAG (APPROVED)</div>
+        </div>
+      </div>
+      <div class="sticker-body">
+        <div class="sticker-fields">
+          <div class="sticker-field">ชื่ออุปกรณ์: <span id="print-eq-name">-</span></div>
+          <div class="sticker-field">หมายเลขซีเรียล: <span id="print-eq-serial">-</span></div>
+          <div class="sticker-field">บริษัทผู้รับเหมา: <span id="print-eq-contractor">-</span></div>
+          <div class="sticker-field" style="margin-top: 0.5mm;">วันหมดอายุ: <span id="print-eq-expiry" style="color: var(--danger-color); font-weight: bold;">-</span></div>
+          
+          <!-- แถบสีประจำเดือน แนวนอนใต้วันหมดอายุ มีตัวหนังสือตัวย่อสีดำตัวหนาเข้มทับอยู่กึ่งกลาง ครอบด้วยกรอบสีดำ -->
+          <div class="sticker-month-bar" id="sticker-footer-color" style="margin-top: 1.5mm; height: 5.5mm; border-radius: 0.6mm; text-align: center; line-height: 5.5mm; display: flex; align-items: center; justify-content: center; border: 0.4mm solid #000000;">
+            <span id="print-eq-month-color-name" style="color: #000000; font-weight: 900; font-size: 11px; display: block; width: 100%; font-family: sans-serif;">-</span>
+          </div>
+        </div>
+        <div class="sticker-qrcode-container">
+          <div id="sticker-qrcode" class="sticker-qrcode"></div>
+          <div class="sticker-qrcode-label">สแกนเพื่อตรวจสถานะ</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Training Details Modal -->
+  <div class="modal" id="training-details-modal">
+    <div class="modal-content" style="max-width: 500px;">
+      <div class="modal-header">
+        <div>
+          <h2 id="t-modal-name" style="font-size: 16px; font-weight: 700; color: var(--dark-color);">ชื่อ-นามสกุล</h2>
+          <p id="t-modal-company" style="font-size: 12px; color: #78909c; margin-top: 4px;"></p>
+        </div>
+        <button class="close-modal" onclick="closeModal('training-details-modal')">&times;</button>
+      </div>
+      <div class="modal-body" style="display: flex; flex-direction: column; gap: 16px;">
+        
+        <!-- Rejection / Photo Correction Alert Box -->
+        <div id="t-modal-alert-box" style="display: none; padding: 12px 16px; border-radius: 8px; border: 1px solid var(--danger-color); background-color: #ffebee; color: var(--danger-color); font-size: 13px;">
+          <div style="font-weight: 700;" id="t-modal-alert-title"></div>
+          <div style="font-size: 12px; margin-top: 4px;" id="t-modal-alert-desc"></div>
+        </div>
+
+        <!-- Info Grid -->
+        <div class="form-row" style="margin-bottom: 0;">
+          <div class="form-group" style="background-color: var(--light-bg); padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border-color); flex: 1;">
+            <label style="font-size: 10px; text-transform: uppercase; color: #78909c; margin-bottom: 2px;">เลขบัตรประชาชน</label>
+            <p id="t-modal-idcard" style="font-size: 13px; font-weight: 700; color: var(--dark-color); font-family: monospace;"></p>
+          </div>
+          <div class="form-group" style="background-color: var(--light-bg); padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border-color); flex: 1;">
+            <label style="font-size: 10px; text-transform: uppercase; color: #78909c; margin-bottom: 2px;">หลักสูตรอบรม</label>
+            <p id="t-modal-course" style="font-size: 13px; font-weight: 700; color: var(--dark-color);"></p>
+          </div>
+        </div>
+        
+        <div class="form-row" style="margin-bottom: 0;">
+          <div class="form-group" style="background-color: var(--light-bg); padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border-color); flex: 1;">
+            <label style="font-size: 10px; text-transform: uppercase; color: #78909c; margin-bottom: 2px;">วันที่อบรม</label>
+            <p id="t-modal-date" style="font-size: 13px; font-weight: 700; color: var(--dark-color);"></p>
+          </div>
+          <div class="form-group" style="background-color: var(--light-bg); padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border-color); flex: 1;">
+            <label style="font-size: 10px; text-transform: uppercase; color: #78909c; margin-bottom: 2px;">เลข Just ID</label>
+            <p id="t-modal-justidno" style="font-size: 13px; font-weight: 700; color: var(--dark-color); font-family: monospace;"></p>
+          </div>
+        </div>
+
+        <!-- Badges Status Section -->
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <h4 style="font-size: 12px; font-weight: 700; color: #546e7a; text-transform: uppercase; margin-bottom: 4px;">ตรวจสอบสถานะ</h4>
+          
+          <div style="display: flex; flex-direction: column; gap: 8px;">
+            <!-- Score Status -->
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background-color: var(--light-bg); border: 1px solid var(--border-color); border-radius: 8px;">
+              <span style="font-size: 13px; font-weight: 600; color: #546e7a;">สถานะคะแนนสอบ</span>
+              <div id="t-modal-status-score"></div>
+            </div>
+            <!-- Doc Check Status -->
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background-color: var(--light-bg); border: 1px solid var(--border-color); border-radius: 8px;">
+              <span style="font-size: 13px; font-weight: 600; color: #546e7a;">สถานะการตรวจเอกสาร</span>
+              <div id="t-modal-status-doc"></div>
+            </div>
+            <!-- Just ID Status -->
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; background-color: var(--light-bg); border: 1px solid var(--border-color); border-radius: 8px;">
+              <span style="font-size: 13px; font-weight: 600; color: #546e7a;">สถานะ Just ID</span>
+              <div id="t-modal-status-justid"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Remarks / Notes Section -->
+        <div id="t-modal-remark-section" style="display: none; flex-direction: column; gap: 8px;">
+          <h4 style="font-size: 12px; font-weight: 700; color: #546e7a; text-transform: uppercase; margin-bottom: 4px;">หมายเหตุ / ข้อมูลเพิ่มเติม</h4>
+          <div style="padding: 12px; background-color: var(--light-bg); border: 1px solid var(--border-color); border-radius: 8px;">
+            <p id="t-modal-remark" style="font-size: 13px; color: var(--dark-color); line-height: 1.5;"></p>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" onclick="closeModal('training-details-modal')">ปิดหน้าต่าง</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Add Daily Audit Statistics Modal -->
+  <div class="modal" id="add-daily-audit-modal">
+    <div class="modal-content" style="max-width: 480px;">
+      <div class="modal-header">
+        <h2>บันทึกยอดการส่งตรวจอุปกรณ์รายวัน</h2>
+        <button class="close-modal" onclick="closeModal('add-daily-audit-modal')">&times;</button>
+      </div>
+      <form id="audit-form" onsubmit="saveDailyAudit(event)">
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="audit-date">วันที่บันทึกตรวจ</label>
+            <input type="date" class="form-control" id="audit-date" required>
+          </div>
+          <div class="form-group">
+            <label for="audit-contractor">บริษัทผู้รับเหมา</label>
+            <select class="form-control" id="audit-contractor" required>
+              <!-- Populated dynamically -->
+            </select>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="audit-total">จำนวนอุปกรณ์นำมาตรวจทั้งหมด (ชิ้น)</label>
+              <input type="number" class="form-control" id="audit-total" required min="1" placeholder="ระบุจำนวน" oninput="calculateAuditFailCount()">
+            </div>
+            <div class="form-group">
+              <label for="audit-pass">ผ่านการตรวจ / ออกป้าย Tag (ชิ้น)</label>
+              <input type="number" class="form-control" id="audit-pass" required min="0" placeholder="ผ่านการตรวจ" oninput="calculateAuditFailCount()">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>ตกเกณฑ์ตรวจสอบความปลอดภัย (Auto): <strong id="audit-fail-label" style="color: var(--danger-color); font-size: 15px;">0</strong> ชิ้น</label>
+            <input type="hidden" id="audit-fail" value="0">
+          </div>
+          <div class="form-group">
+            <label for="audit-notes">สาเหตุที่ไม่ผ่าน / หมายเหตุเพิ่มเติม</label>
+            <textarea class="form-control" id="audit-notes" rows="2" placeholder="เช่น สายไฟตู้เชื่อมชำรุดไม่มีสายดิน, สวิตช์เสียไม่มีการ์ดครอบใบเจียร..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" onclick="closeModal('add-daily-audit-modal')">ยกเลิก</button>
+          <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check"></i> บันทึกสถิติ</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Add PPE Bulk Inspection Modal -->
+  <div class="modal" id="add-ppe-audit-modal">
+    <div class="modal-content" style="max-width: 480px;">
+      <div class="modal-header">
+        <h2>บันทึกตรวจสอบและขึ้นทะเบียน PPE</h2>
+        <button class="close-modal" onclick="closeModal('add-ppe-audit-modal')">&times;</button>
+      </div>
+      <form id="ppe-form" onsubmit="savePpeAudit(event)">
+        <div class="modal-body">
+          <div class="form-group">
+            <label for="ppe-date">วันที่บันทึกตรวจ</label>
+            <input type="date" class="form-control" id="ppe-date" required>
+          </div>
+          <div class="form-group">
+            <label for="ppe-contractor">บริษัทผู้รับเหมา</label>
+            <select class="form-control" id="ppe-contractor" required>
+              <!-- Populated dynamically -->
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="ppe-type">ประเภทอุปกรณ์ PPE ที่ส่งตรวจ</label>
+            <select class="form-control" id="ppe-type" required>
+              <!-- Populated dynamically from Config -->
+            </select>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="ppe-total">จำนวนที่นำมาตรวจทั้งหมด (ชิ้น)</label>
+              <input type="number" class="form-control" id="ppe-total" required min="1" placeholder="ระบุจำนวน" oninput="calculatePpeFailCount()">
+            </div>
+            <div class="form-group">
+              <label for="ppe-pass">ผ่านเกณฑ์การตรวจ (ชิ้น)</label>
+              <input type="number" class="form-control" id="ppe-pass" required min="0" placeholder="ผ่านการตรวจ" oninput="calculatePpeFailCount()">
+            </div>
+          </div>
+          <div class="form-group">
+            <label>ตกเกณฑ์ตรวจสอบ (Auto): <strong id="ppe-fail-label" style="color: var(--danger-color); font-size: 15px;">0</strong> ชิ้น</label>
+            <input type="hidden" id="ppe-fail" value="0">
+          </div>
+          <div class="form-group">
+            <label for="ppe-notes">สาเหตุที่ไม่ผ่าน / หมายเหตุเพิ่มเติม</label>
+            <textarea class="form-control" id="ppe-notes" rows="2" placeholder="เช่น ชำรุดสายรัดขาด, ไม่มีเครื่องหมาย มอก., รองเท้าเซฟตี้พื้นทะลุ..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline" onclick="closeModal('add-ppe-audit-modal')">ยกเลิก</button>
+          <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check"></i> บันทึกข้อมูลและขึ้นทะเบียน</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- QR Scanner Modal -->
+  <div class="modal" id="qr-scanner-modal">
+    <div class="modal-content" style="max-width: 420px; text-align: center;">
+      <div class="modal-header" style="text-align: left;">
+        <h2>กล้องสแกน QR Code หน้างาน</h2>
+        <button class="close-modal" onclick="stopQrScan()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="qr-reader" style="width: 100%; border-radius: 8px; overflow: hidden; background-color: #000; margin-bottom: 12px; border: 2px solid var(--border-color);"></div>
+        <p style="font-size: 12px; color: #78909c;"><i class="fa-solid fa-circle-info"></i> ถือกล้องให้นิ่งและหันหน้าคิวอาร์โค้ดสติกเกอร์ตรงกรอบ</p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" style="width: 100%;" onclick="stopQrScan()">ปิดกล้อง/ยกเลิก</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Equipment Status Lookup Modal -->
+  <div class="modal" id="equipment-lookup-modal">
+    <div class="modal-content" style="max-width: 500px;">
+      <div class="modal-header">
+        <h2>ผลการตรวจสอบสถานะอุปกรณ์ด่วน</h2>
+        <button class="close-modal" onclick="closeModal('equipment-lookup-modal')">&times;</button>
+      </div>
+      <div class="modal-body" style="display: flex; flex-direction: column; gap: 16px;">
+        <div id="lookup-status-badge-container" style="text-align: center; padding: 12px; border-radius: 8px; font-size: 14px; font-weight: bold;">
+          <!-- Rendered dynamically -->
+        </div>
+        
+        <div style="text-align: center; margin-bottom: 4px;" id="lookup-photo-container">
+          <!-- Equipment Photo Rendered here -->
+        </div>
+        
+        <div style="background-color: var(--light-bg); padding: 16px; border-radius: 8px; display: flex; flex-direction: column; gap: 8px; font-size: 13px;">
+          <div><strong>ชื่ออุปกรณ์:</strong> <span id="lookup-eq-name">-</span></div>
+          <div><strong>หมายเลขซีเรียล (Serial):</strong> <span id="lookup-eq-serial">-</span></div>
+          <div><strong>บริษัทผู้รับเหมา:</strong> <span id="lookup-eq-contractor">-</span></div>
+          <div><strong>วันที่ตรวจสอบล่าสุด:</strong> <span id="lookup-eq-date">-</span></div>
+          <div><strong>วันหมดอายุ Tag:</strong> <span id="lookup-eq-expiry">-</span></div>
+          <div><strong>สีป้ายประจำเดือน:</strong> <span id="lookup-eq-color">-</span></div>
+        </div>
+        
+        <div id="lookup-patrol-history" style="display: none;">
+          <h3 style="font-size: 14px; font-weight: 600; margin-top: 12px; margin-bottom: 8px; color: var(--danger-color);">ประวัติการพบข้อบกพร่อง</h3>
+          <div class="table-container" style="max-height: 120px; overflow-y: auto;">
+            <table style="min-width: 100%; font-size: 11px;">
+              <thead>
+                <tr>
+                  <th>วันที่</th>
+                  <th>ข้อบกพร่อง</th>
+                  <th>สถานะ CAPA</th>
+                </tr>
+              </thead>
+              <tbody id="lookup-patrol-list">
+                <!-- Rendered via JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" onclick="closeModal('equipment-lookup-modal')" style="width: 100%;">ปิดหน้าต่าง</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- App Application JS Controller -->
+  <script src="app.js"></script>
+</body>
+</html>
