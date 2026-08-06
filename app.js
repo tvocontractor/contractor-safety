@@ -2838,7 +2838,7 @@ async function sendPatrolDigest() {
       setTimeout(() => { loadData(); }, 1500);
     } catch (e) {
       console.error(e);
-      alert('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์เพื่อจัดส่งอีเมล');
+      alert('เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์เพื่อจัดส่งอีเมล: ' + e.message);
     }
   } else {
     // โหมดจำลองออฟไลน์
