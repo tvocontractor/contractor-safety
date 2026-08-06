@@ -421,14 +421,14 @@ function saveLocalAction(action, payload) {
       list[index]['ทำงานพื้นที่'] = payload.area;
       list[index]['ผู้ควบคุมงาน'] = payload.supervisor;
       list[index]['Email'] = payload.email;
-      list[index]['สถานะ'] = 'ใช้งานอยู่';
+      list[index]['สถานะ'] = payload.status || 'ใช้งานอยู่';
     } else {
       list.push({
         'ชื่อบริษัท': payload.companyName,
         'ทำงานพื้นที่': payload.area,
         'ผู้ควบคุมงาน': payload.supervisor,
         'Email': payload.email,
-        'สถานะ': 'ใช้งานอยู่'
+        'สถานะ': payload.status || 'ใช้งานอยู่'
       });
     }
     localStorage.setItem('cached_contractors', JSON.stringify(list));
