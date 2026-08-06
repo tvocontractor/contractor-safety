@@ -270,7 +270,7 @@ function renderFormDropdowns() {
   // 3. Dropdown จป. ผู้ตรวจ
   const inspectorSelect = document.getElementById('p-inspector');
   if (inspectorSelect && appState.areaMapping && appState.areaMapping.length > 0) {
-    const inspectors = [...new Set(appState.areaMapping.map(item => item['รายชื่อ จป. ผู้ตรวจ']).filter(Boolean))];
+    const inspectors = [...new Set(appState.areaMapping.map(item => item['รายชื่อ จป.ผู้ตรวจ'] || item['รายชื่อ จป. ผู้ตรวจ']).filter(Boolean))];
     inspectorSelect.innerHTML = '<option value="">-- เลือก จป. ผู้ตรวจ --</option>' + 
       inspectors.map(name => `<option value="${name}">${name}</option>`).join('');
   }
@@ -846,7 +846,7 @@ function renderContractorsTable() {
   }
   
   appState.contractors.forEach(c => {
-    const isInactive = c['สถานะ'] === 'ปิดใช้งาน';
+    const isInactive = c['สถานะ'] === 'ปิดใช้งาน' || c['สถานะ'] === 'ปิดการใช้งาน';
     const statusClass = isInactive ? 'inactive' : 'active';
     
     // HTML ตารางสำหรับ PC (ซ่อนพื้นที่, ผู้ควบคุม, อีเมล)
@@ -872,6 +872,18 @@ function renderContractorsTable() {
     `;
     mobileCards.appendChild(card);
   });
+}
+
+function openAddContractorModal() {
+  document.getElementById('contractor-modal-title').innerText = 'เพิ่มผู้รับเหมาใหม่';
+  document.getElementById('c-company-name').value = '';
+  document.getElementById('c-company-name').removeAttribute('readonly');
+  document.getElementById('c-area').value = '-';
+  document.getElementById('c-supervisor').value = '-';
+  document.getElementById('c-email').value = 'info@company.com';
+  document.getElementById('c-status').value = 'ใช้งานอยู่';
+  document.getElementById('c-status-group').style.display = 'block'; // แสดงช่องสถานะให้เลือก
+  openModal('add-contractor-modal');
 }
 
 function openEditContractor(name) {
