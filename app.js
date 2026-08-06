@@ -773,6 +773,24 @@ function triggerFileInput(fileInputId) {
   document.getElementById(fileInputId).click();
 }
 
+function triggerPhotoUpload(baseId) {
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  if (isMobile) {
+    const useCamera = confirm("📷 ต้องการถ่ายรูปใหม่ด้วยกล้อง หรือเลือกจากคลังภาพ (Gallery)?\n\n- กด [ ตกลง / OK ] เพื่อเปิดกล้องถ่ายรูปใหม่\n- กด [ ยกเลิก / Cancel ] เพื่อเลือกจากคลังภาพ/แกลเลอรี");
+    if (useCamera) {
+      const camInput = document.getElementById(baseId + '-camera');
+      if (camInput) camInput.click();
+    } else {
+      const galInput = document.getElementById(baseId + '-gallery');
+      if (galInput) galInput.click();
+    }
+  } else {
+    // ในคอมพิวเตอร์ให้เปิดกล่องหาไฟล์ปกติจากเครื่อง
+    const galInput = document.getElementById(baseId + '-gallery');
+    if (galInput) galInput.click();
+  }
+}
+
 function handleImageUpload(event, previewId, base64HiddenId) {
   const file = event.target.files[0];
   if (!file) return;
@@ -878,6 +896,10 @@ function renderEquipmentTable() {
   const mobileCards = document.getElementById('equipment-mobile-cards');
   if (!tbody) return;
   
+  const selectAllCheckbox = document.getElementById('check-all-eq');
+  if (selectAllCheckbox) selectAllCheckbox.checked = false;
+  updateEqBulkPrintButtonVisibility();
+  
   tbody.innerHTML = '';
   mobileCards.innerHTML = '';
   
@@ -913,7 +935,7 @@ function renderEquipmentTable() {
       : `<i class="fa-solid fa-screwdriver-wrench" style="color: #78909c; margin-right: 8px; font-size: 14px; vertical-align: middle;"></i>`;
       
     tr.innerHTML = `
-      <td style="text-align: center;"><input type="checkbox" class="eq-row-checkbox" value="${e['ID']}"></td>
+      <td style="text-align: center;"><input type="checkbox" class="eq-row-checkbox" value="${e['ID']}" onchange="updateEqBulkPrintButtonVisibility()"></td>
       <td style="font-weight: 600;">
         <div style="display: flex; align-items: center; gap: 8px;">
           ${imgHtml}
@@ -2921,6 +2943,7 @@ function stopQrScan() {
 function toggleAllEqCheckboxes(master) {
   const checkboxes = document.querySelectorAll('.eq-row-checkbox');
   checkboxes.forEach(cb => cb.checked = master.checked);
+  updateEqBulkPrintButtonVisibility();
 }
 
 // ฟังก์ชันเปิด/ปิด Checkbox หน้า PPE ทั้งหมด
@@ -3101,6 +3124,14 @@ function bulkPrintSelectedTags() {
   bulkPrintTags(selectedEq);
 }
 
+// อัปเดตการแสดงผลปุ่มพิมพ์กลุ่ม (Bulk Print) ตามจำนวนการติ๊กเลือก Checkbox
+function updateEqBulkPrintButtonVisibility() {
+  const btn = document.getElementById('btn-bulk-print');
+  if (!btn) return;
+  const checkedCount = document.querySelectorAll('.eq-row-checkbox:checked').length;
+  btn.style.display = checkedCount > 0 ? 'inline-block' : 'none';
+}
+
 // พิมพ์ป้ายแบบกลุ่มตามปุ่มที่เลือก (Bulk Print สำหรับตาราง PPE)
 function bulkPrintSelectedPpeTags() {
   const checkedBoxes = document.querySelectorAll('.ppe-row-checkbox:checked');
@@ -3267,6 +3298,7 @@ function lookupEquipmentStatus(serial) {
     renderPatrolHistoryForLookup(serial, historyDiv, tbody);
     
     openModal('equipment-lookup-modal');
+    alert(`❌ ไม่พบข้อมูลการขึ้นทะเบียน:\n---------------------------\nไม่พบข้อมูลการขึ้นทะเบียนเครื่องมือช่าง หมายเลขซีเรียล "${serial}" ในระบบครับ`);
     return;
   }
   
@@ -3316,6 +3348,10 @@ function lookupEquipmentStatus(serial) {
   renderPatrolHistoryForLookup(eq['หมายเลขซีเรียล'], historyDiv, tbody);
   
   openModal('equipment-lookup-modal');
+  
+  // แจ้งเตือนสถานะทันทีทาง Pop-up
+  const statusStr = isDefective ? '❌ อุปกรณ์ชำรุด (มีเคสความปลอดภัยคงค้าง)' : (isExpired ? '⚠️ หมดอายุการตรวจแล้ว' : '✅ ปกติ (ใช้งานปลอดภัย)');
+  alert(`📢 ตรวจสอบสถานะอุปกรณ์:\n---------------------------\nชื่ออุปกรณ์: ${eq['ชื่ออุปกรณ์']}\nหมายเลขซีเรียล: ${eq['หมายเลขซีเรียล']}\nบริษัทผู้รับเหมา: ${eq['บริษัทผู้รับเหมา']}\nสถานะ: ${statusStr}\nวันหมดอายุ Tag: ${formatThaiDate(eq['วันหมดอายุ Tag'])}`);
 }
 
 function getColorHexFromMonthName(monthName) {
