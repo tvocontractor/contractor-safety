@@ -1906,7 +1906,7 @@ function getDirectDriveImageUrl(url) {
       fileId = url.split('?id=')[1].split('&')[0];
     }
     if (fileId) {
-      return 'https://drive.google.com/uc?export=view&id=' + fileId;
+      return 'https://lh3.googleusercontent.com/d/' + fileId;
     }
   }
   return url;
@@ -3259,8 +3259,11 @@ function lookupEquipmentStatus(serial) {
   }
   
   serial = serial.trim();
-  // ค้นหาแบบตรงตัวหรือมีหมายเลข ID ตรงกัน
-  const eq = appState.equipment.find(item => item['หมายเลขซีเรียล'] === serial || item['ID'] === serial);
+  // ค้นหาแบบตรงตัวหรือมีหมายเลข ID ตรงกัน (แปลงเป็น string เพื่อเทียบแบบปลอดภัย)
+  const eq = appState.equipment.find(item => 
+    (item['หมายเลขซีเรียล'] !== undefined && String(item['หมายเลขซีเรียล']).trim() === String(serial)) || 
+    (item['ID'] !== undefined && String(item['ID']).trim().toLowerCase() === String(serial).toLowerCase())
+  );
   
   const badgeContainer = document.getElementById('lookup-status-badge-container');
   const photoContainer = document.getElementById('lookup-photo-container');
