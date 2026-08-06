@@ -714,10 +714,11 @@
           </div>
           <div class="form-group" style="margin-top: 12px;">
             <label>รูปภาพอุปกรณ์ขณะตรวจสอบผ่าน (Photo)</label>
-            <div class="image-upload-area" onclick="triggerFileInput('eq-image-file')">
+            <div class="image-upload-area" onclick="triggerPhotoUpload('eq-image-file')">
               <i class="fa-solid fa-camera" style="font-size: 32px; color: #78909c; margin-bottom: 8px;"></i>
               <p style="font-size: 13px; color: #546e7a;">คลิกเพื่อถ่ายภาพ หรืออัปโหลดรูปอุปกรณ์</p>
-              <input type="file" id="eq-image-file" accept="image/*" style="display: none;" onchange="handleImageUpload(event, 'eq-preview', 'eq-base64')">
+              <input type="file" id="eq-image-file-gallery" accept="image/*" style="display: none;" onchange="handleImageUpload(event, 'eq-preview', 'eq-base64')">
+              <input type="file" id="eq-image-file-camera" accept="image/*" capture="environment" style="display: none;" onchange="handleImageUpload(event, 'eq-preview', 'eq-base64')">
               <input type="hidden" id="eq-base64">
               <img id="eq-preview" class="image-preview" alt="Equipment Preview Image" style="display: none;">
             </div>
@@ -812,10 +813,11 @@
           </div>
           <div class="form-group">
             <label>รูปภาพข้อบกพร่องหน้างาน (Before)</label>
-            <div class="image-upload-area" onclick="triggerFileInput('p-before-image-file')">
+            <div class="image-upload-area" onclick="triggerPhotoUpload('p-before-image-file')">
               <i class="fa-solid fa-camera" style="font-size: 32px; color: #78909c; margin-bottom: 8px;"></i>
               <p style="font-size: 13px; color: #546e7a;">คลิกเพื่อถ่ายภาพ หรืออัปโหลดรูป</p>
-              <input type="file" id="p-before-image-file" accept="image/*" style="display: none;" onchange="handleImageUpload(event, 'p-before-preview', 'p-before-base64')">
+              <input type="file" id="p-before-image-file-gallery" accept="image/*" style="display: none;" onchange="handleImageUpload(event, 'p-before-preview', 'p-before-base64')">
+              <input type="file" id="p-before-image-file-camera" accept="image/*" capture="environment" style="display: none;" onchange="handleImageUpload(event, 'p-before-preview', 'p-before-base64')">
               <input type="hidden" id="p-before-base64">
               <img id="p-before-preview" class="image-preview" alt="Preview Image">
             </div>
@@ -923,10 +925,11 @@
           
           <div class="form-group">
             <label>รูปภาพผลการแก้ไขเสร็จสิ้น (After)</label>
-            <div class="image-upload-area" onclick="triggerFileInput('p-after-image-file')">
+            <div class="image-upload-area" onclick="triggerPhotoUpload('p-after-image-file')">
               <i class="fa-solid fa-camera-retro" style="font-size: 32px; color: #78909c; margin-bottom: 8px;"></i>
               <p style="font-size: 13px; color: #546e7a;">ถ่ายภาพสดการแก้ไข หรืออัปโหลดรูป</p>
-              <input type="file" id="p-after-image-file" accept="image/*" style="display: none;" onchange="handleImageUpload(event, 'p-after-preview', 'p-after-base64')">
+              <input type="file" id="p-after-image-file-gallery" accept="image/*" style="display: none;" onchange="handleImageUpload(event, 'p-after-preview', 'p-after-base64')">
+              <input type="file" id="p-after-image-file-camera" accept="image/*" capture="environment" style="display: none;" onchange="handleImageUpload(event, 'p-after-preview', 'p-after-base64')">
               <input type="hidden" id="p-after-base64">
               <img id="p-after-preview" class="image-preview" alt="After Preview Image">
             </div>
