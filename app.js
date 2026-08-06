@@ -907,9 +907,9 @@ function renderEquipmentTable() {
     }
     
     const tr = document.createElement('tr');
-    const hasPhoto = e['รูปภาพอุปกรณ์'] ? true : false;
+    const hasPhoto = (e['รูปภาพอุปกรณ์'] && e['รูปภาพอุปกรณ์'] !== '-') ? true : false;
     const imgHtml = hasPhoto 
-      ? `<img src="${e['รูปภาพอุปกรณ์']}" style="width: 36px; height: 27px; object-fit: cover; border-radius: 4px; vertical-align: middle; margin-right: 8px; cursor: pointer;" onclick="showLightbox('${e['รูปภาพอุปกรณ์']}')">` 
+      ? `<img src="${getDirectDriveImageUrl(e['รูปภาพอุปกรณ์'])}" style="width: 36px; height: 27px; object-fit: cover; border-radius: 4px; vertical-align: middle; margin-right: 8px; cursor: pointer;" onclick="showLightbox('${getDirectDriveImageUrl(e['รูปภาพอุปกรณ์'])}')">` 
       : `<i class="fa-solid fa-screwdriver-wrench" style="color: #78909c; margin-right: 8px; font-size: 14px; vertical-align: middle;"></i>`;
       
     tr.innerHTML = `
@@ -942,7 +942,7 @@ function renderEquipmentTable() {
     const card = document.createElement('div');
     card.className = 'mobile-card';
     card.innerHTML = `
-      ${hasPhoto ? `<div style="text-align: center; margin-bottom: 10px;"><img src="${e['รูปภาพอุปกรณ์']}" style="width: 100%; max-height: 150px; object-fit: cover; border-radius: 6px;" onclick="showLightbox('${e['รูปภาพอุปกรณ์']}')"></div>` : ''}
+      ${hasPhoto ? `<div style="text-align: center; margin-bottom: 10px;"><img src="${getDirectDriveImageUrl(e['รูปภาพอุปกรณ์'])}" style="width: 100%; max-height: 150px; object-fit: cover; border-radius: 6px;" onclick="showLightbox('${getDirectDriveImageUrl(e['รูปภาพอุปกรณ์'])}')"></div>` : ''}
       <div style="font-weight: bold; font-size: 15px; margin-bottom: 8px;">${e['ชื่ออุปกรณ์']} (${e['หมายเลขซีเรียล']})</div>
       <div style="font-size: 13px; margin-bottom: 4px;"><strong>ผู้รับเหมา:</strong> ${e['บริษัทผู้รับเหมา']}</div>
       <div style="font-size: 13px; margin-bottom: 4px;"><strong>หมดอายุ:</strong> <span class="status-badge ${labelClass}">${formatThaiDate(e['วันหมดอายุ Tag'])}</span></div>
@@ -1023,13 +1023,15 @@ function renderPatrolLogsTable() {
     
     // ภาพ Before & After
     let imagesHtml = '';
-    if (log['ภาพ Before']) {
-      imagesHtml += `<img src="${log['ภาพ Before']}" class="ba-img" onclick="showLightbox('${log['ภาพ Before']}')" title="ก่อนแก้ไข">`;
+    if (log['ภาพ Before'] && log['ภาพ Before'] !== '-') {
+      const beforeUrl = getDirectDriveImageUrl(log['ภาพ Before']);
+      imagesHtml += `<img src="${beforeUrl}" class="ba-img" onclick="showLightbox('${beforeUrl}')" title="ก่อนแก้ไข">`;
     } else {
       imagesHtml += '<span style="font-size: 11px; color:#aaa;">ไม่มีภาพ</span>';
     }
-    if (log['ภาพ After']) {
-      imagesHtml += ` <img src="${log['ภาพ After']}" class="ba-img" onclick="showLightbox('${log['ภาพ After']}')" title="หลังแก้ไข">`;
+    if (log['ภาพ After'] && log['ภาพ After'] !== '-') {
+      const afterUrl = getDirectDriveImageUrl(log['ภาพ After']);
+      imagesHtml += ` <img src="${afterUrl}" class="ba-img" onclick="showLightbox('${afterUrl}')" title="หลังแก้ไข">`;
     }
     
     const tr = document.createElement('tr');
@@ -1068,8 +1070,8 @@ function renderPatrolLogsTable() {
         <strong>สถานะ:</strong> <span class="status-badge ${statusClass}">${log['สถานะ CAPA']}</span>
       </div>
       <div style="margin-bottom: 8px; display: flex; gap: 8px;">
-        ${log['ภาพ Before'] ? `<div><span style="font-size:10px; display:block; color:#777;">Before:</span><img src="${log['ภาพ Before']}" style="width: 60px; height: 45px; object-fit: cover; border-radius: 4px;" onclick="showLightbox('${log['ภาพ Before']}')"></div>` : ''}
-        ${log['ภาพ After'] ? `<div><span style="font-size:10px; display:block; color:#777;">After:</span><img src="${log['ภาพ After']}" style="width: 60px; height: 45px; object-fit: cover; border-radius: 4px;" onclick="showLightbox('${log['ภาพ After']}')"></div>` : ''}
+        ${log['ภาพ Before'] && log['ภาพ Before'] !== '-' ? `<div><span style="font-size:10px; display:block; color:#777;">Before:</span><img src="${getDirectDriveImageUrl(log['ภาพ Before'])}" style="width: 60px; height: 45px; object-fit: cover; border-radius: 4px;" onclick="showLightbox('${getDirectDriveImageUrl(log['ภาพ Before'])}')"></div>` : ''}
+        ${log['ภาพ After'] && log['ภาพ After'] !== '-' ? `<div><span style="font-size:10px; display:block; color:#777;">After:</span><img src="${getDirectDriveImageUrl(log['ภาพ After'])}" style="width: 60px; height: 45px; object-fit: cover; border-radius: 4px;" onclick="showLightbox('${getDirectDriveImageUrl(log['ภาพ After'])}')"></div>` : ''}
       </div>
       ${log['สถานะ CAPA'] === 'รอดำเนินการ CAPA' ? `
         <div style="text-align: right; border-top: 1px solid #eee; padding-top: 8px;">
@@ -1271,9 +1273,10 @@ function printStickerTag(eqId) {
   qrContainer.innerHTML = ''; // ล้างของเก่า
   
   // สร้าง URL ของอุปกรณ์ชิ้นนี้เพื่อให้สแกนแล้วเปิดดูประวัติได้เลย (หากรันออนไลน์)
+  const PUBLIC_URL = 'https://tvocontractor.github.io/contractor-safety/';
   const isLocal = window.location.protocol === 'file:';
   const qrUrl = isLocal 
-    ? (SCRIPT_URL ? `${SCRIPT_URL}?serial=${encodeURIComponent(eq['หมายเลขซีเรียล'])}` : eq['หมายเลขซีเรียล'])
+    ? `${PUBLIC_URL}?serial=${encodeURIComponent(eq['หมายเลขซีเรียล'])}`
     : `${window.location.origin}${window.location.pathname}?serial=${encodeURIComponent(eq['หมายเลขซีเรียล'])}`;
     
   new QRCode(qrContainer, {
@@ -1868,6 +1871,23 @@ function formatThaiDate(dateStr) {
   const year = date.getFullYear() + 543; // แปลงพุทธศักราช
   
   return `${day} ${month} ${year}`;
+}
+
+// แปลงลิงก์ Google Drive Viewer ให้เป็นลิงก์รูปภาพโดยตรงเพื่อให้แสดงผลในแท็ก img ได้
+function getDirectDriveImageUrl(url) {
+  if (!url || url === '-' || url === '') return '';
+  if (url.indexOf('drive.google.com') !== -1) {
+    var fileId = '';
+    if (url.indexOf('/file/d/') !== -1) {
+      fileId = url.split('/file/d/')[1].split('/')[0];
+    } else if (url.indexOf('?id=') !== -1) {
+      fileId = url.split('?id=')[1].split('&')[0];
+    }
+    if (fileId) {
+      return 'https://drive.google.com/uc?export=view&id=' + fileId;
+    }
+  }
+  return url;
 }
 
 // =========================================================================
@@ -3162,7 +3182,7 @@ function bulkPrintTags(items) {
             <!-- รูปถ่ายอุปกรณ์ (ไม่แสดงถ้าเป็น PPE) -->
             ${isPpe ? '' : `
             <div class="sticker-image-container" style="width: 20mm; height: 20mm; display: flex; flex-direction: column; align-items: center; justify-content: center; border: 0.3mm solid #000000; margin-left: 2mm; overflow: hidden; border-radius: 0.6mm; background: #fafafa; box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;">
-              ${item['รูปภาพอุปกรณ์'] ? `<img src="${item['รูปภาพอุปกรณ์']}" style="width: 100%; height: 100%; object-fit: cover;">` : `<i class="fa-solid fa-camera" style="font-size: 12px; color: #bbb; margin-bottom: 2px;"></i><span style="font-size: 5px; color: #bbb; text-align: center; transform: scale(0.9);">ไม่มีรูป</span>`}
+              ${item['รูปภาพอุปกรณ์'] && item['รูปภาพอุปกรณ์'] !== '-' ? `<img src="${getDirectDriveImageUrl(item['รูปภาพอุปกรณ์'])}" style="width: 100%; height: 100%; object-fit: cover;">` : `<i class="fa-solid fa-camera" style="font-size: 12px; color: #bbb; margin-bottom: 2px;"></i><span style="font-size: 5px; color: #bbb; text-align: center; transform: scale(0.9);">ไม่มีรูป</span>`}
             </div>
             `}
 
@@ -3179,9 +3199,10 @@ function bulkPrintTags(items) {
   container.innerHTML = cardsHtml;
   
   items.forEach((item, idx) => {
+    const PUBLIC_URL = 'https://tvocontractor.github.io/contractor-safety/';
     const isLocal = window.location.protocol === 'file:';
     const qrUrl = isLocal 
-      ? (SCRIPT_URL ? `${SCRIPT_URL}?serial=${encodeURIComponent(item['หมายเลขซีเรียล'])}` : item['หมายเลขซีเรียล'])
+      ? `${PUBLIC_URL}?serial=${encodeURIComponent(item['หมายเลขซีเรียล'])}`
       : `${window.location.origin}${window.location.pathname}?serial=${encodeURIComponent(item['หมายเลขซีเรียล'])}`;
     
     new QRCode(document.getElementById(`bulk-qr-${idx}`), {
@@ -3268,8 +3289,9 @@ function lookupEquipmentStatus(serial) {
   }
   
   // การแสดงผลรูปภาพ
-  if (eq['รูปภาพอุปกรณ์']) {
-    photoContainer.innerHTML = `<img src="${eq['รูปภาพอุปกรณ์']}" style="width: 100%; max-height: 220px; border-radius: 8px; border: 1px solid #ddd; object-fit: cover; cursor: pointer;" onclick="showLightbox('${eq['รูปภาพอุปกรณ์']}')" title="คลิกเพื่อขยายภาพ">`;
+  if (eq['รูปภาพอุปกรณ์'] && eq['รูปภาพอุปกรณ์'] !== '-') {
+    const directUrl = getDirectDriveImageUrl(eq['รูปภาพอุปกรณ์']);
+    photoContainer.innerHTML = `<img src="${directUrl}" style="width: 100%; max-height: 220px; border-radius: 8px; border: 1px solid #ddd; object-fit: cover; cursor: pointer;" onclick="showLightbox('${directUrl}')" title="คลิกเพื่อขยายภาพ">`;
   } else {
     photoContainer.innerHTML = `
       <div style="padding: 24px; background: #fafafa; border: 1px dashed #ccc; border-radius: 8px; color: #999;">
