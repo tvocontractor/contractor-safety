@@ -2886,17 +2886,36 @@ function startQrScan(targetInputId) {
           let serial = decodedText;
           
           // ตรวจสอบหากลิงก์มีพารามิเตอร์รหัสต่อท้าย ให้ถอดเอาเฉพาะซีเรียลอุปกรณ์
-          if (decodedText.indexOf('id=') > -1) {
+          if (decodedText.startsWith('http://') || decodedText.startsWith('https://')) {
             try {
-              const urlParams = new URLSearchParams(decodedText.split('?')[1]);
-              const id = urlParams.get('id');
-              const eq = appState.equipment.find(item => item['ID'] === id);
-              if (eq) serial = eq['หมายเลขซีเรียล'];
+              const url = new URL(decodedText);
+              // 1. ลองดึงจาก ?serial=
+              let val = url.searchParams.get('serial');
+              if (val) {
+                serial = val;
+              } else {
+                // 2. ลองดึงจาก ?id=
+                val = url.searchParams.get('id');
+                if (val) {
+                  const eq = appState.equipment.find(item => item['ID'] === val);
+                  if (eq) {
+                    serial = eq['หมายเลขซีเรียล'];
+                  } else {
+                    serial = val;
+                  }
+                } else {
+                  // 3. ดึงค่าสุดท้ายของ path เผื่อเป็นลิงก์ตรงที่ไม่มี param
+                  serial = decodedText.substring(decodedText.lastIndexOf('/') + 1);
+                }
+              }
             } catch (e) {
               console.error('URL parse error:', e);
+              if (decodedText.indexOf('/') > -1) {
+                serial = decodedText.substring(decodedText.lastIndexOf('/') + 1);
+              }
             }
           } else if (decodedText.indexOf('/') > -1) {
-            // ดึงค่าสุดท้ายของ URL เผื่อเป็นการสแกนลิงก์ตรง
+            // ดึงค่าสุดท้ายของ URL เผื่อเป็นการสแกนลิงก์ตรงที่ไม่มีโปรโตคอล
             serial = decodedText.substring(decodedText.lastIndexOf('/') + 1);
           }
           
