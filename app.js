@@ -71,7 +71,8 @@ const MONTHLY_COLORS = {
 // 3. ข้อมูลตัวเลือกเริ่มต้นของ ชื่ออุปกรณ์ (Dropdown List)
 const DEFAULT_EQ_TYPES = ['สว่าน', 'เครื่องเจียร์มือถือ (ลูกหมู)', 'เลื่อยจิ๊กซอว์', 'เลื่อยวงเดือน', 'เครื่องเชื่อม (ยกเว้นเครื่องเชื่อมแก๊ส LPG)', 'บล็อกไฟฟ้า', 'ตู้ควบคุมไฟฟ้าชั่วคราว', 'สายไฟปลั๊กพ่วง', 'เครื่องตัดเหล็กไฟเบอร์'];
 
-// 4. รายชื่อข้อบกพร่องด้านความปลอดภัย 13 ข้อหลัก
+// 4. รายชื่อข้อบกพร่องด้านความปลอดภัยหลัก
+// 4. รายชื่อข้อบกพร่องด้านความปลอดภัยหลัก
 const DEFAULT_DEFECT_TYPES = [
   'อุปกรณ์ชำรุด / ไม่ปลอดภัยในการใช้งาน',
   'ไม่มีป้าย Tag หรือ Tag หมดอายุการตรวจ',
@@ -80,13 +81,192 @@ const DEFAULT_DEFECT_TYPES = [
   'ไม่สวมใส่อุปกรณ์คุ้มครองความปลอดภัยส่วนบุคคล (PPE)',
   'ไม่เกี่ยวสายเข็มขัดนิรภัยขณะทำงานบนที่สูง (มากกว่า 2 เมตร)',
   'ปฏิบัติงานโดยไม่มีใบอนุญาตทำงาน (Work Permit)',
-  'ไม่มีผู้เฝ้าระวังไฟ (Fire Watcher) หรือไม่มีถังดับเพลิงประจำจุดเชื่อม',
+  'ไม่มีผู้เฝ้าระวังไฟ (Fire Watcher) หรือไม่มีถังดับเพลิง',
   'ทำงานในที่อับอากาศโดยไม่ได้รับอนุญาต',
   'การจัดเก็บพื้นที่หน้างานไม่เป็นระเบียบเรียบร้อย (Housekeeping)',
-  'กีดขวางอุปกรณ์ดับเพลิง หรืออุปกรณ์ฉุกเฉิน',
   'จัดเก็บสารเคมีหรือแก๊สไวไฟไม่ถูกต้อง',
-  'ทิ้งขยะอันตรายหรือเศษวัสดุก่อสร้างไม่ถูกที่'
+  'ฝ่าฝืนใช้อุปกรณ์ชำรุด / ไม่ผ่านการตรวจ (ฝ่าฝืนข้อห้ามความปลอดภัย)'
 ];
+
+// 4.1 ตารางผูกผันระดับความรุนแรง (A, B, C) และแต้มหักคะแนนโดยอัตโนมัติ (รองรับการอัปเดตจาก Config Sheet)
+const DEFECT_SEVERITY_MAP = {
+  'อุปกรณ์ชำรุด / ไม่ปลอดภัยในการใช้งาน': 'B',
+  'ไม่มีป้าย Tag หรือ Tag หมดอายุการตรวจ': 'B',
+  'การใช้งานอุปกรณ์ผิดประเภท': 'B',
+  'ถอดอุปกรณ์ป้องกันความปลอดภัยออก (Bypass guard)': 'A',
+  'ไม่สวมใส่อุปกรณ์คุ้มครองความปลอดภัยส่วนบุคคล (PPE)': 'C',
+  'ไม่เกี่ยวสายเข็มขัดนิรภัยขณะทำงานบนที่สูง (มากกว่า 2 เมตร)': 'A',
+  'ปฏิบัติงานโดยไม่มีใบอนุญาตทำงาน (Work Permit)': 'A',
+  'ไม่มีผู้เฝ้าระวังไฟ (Fire Watcher) หรือไม่มีถังดับเพลิง': 'B',
+  'ไม่มีผู้เฝ้าระวังไฟ (Fire Watcher) หรือไม่มีถังดับเพลิงประจำจุดเชื่อม': 'B',
+  'ทำงานในที่อับอากาศโดยไม่ได้รับอนุญาต': 'A',
+  'การจัดเก็บพื้นที่หน้างานไม่เป็นระเบียบเรียบร้อย (Housekeeping)': 'C',
+  'จัดเก็บสารเคมีหรือแก๊สไวไฟไม่ถูกต้อง': 'B',
+  'ฝ่าฝืนใช้อุปกรณ์ชำรุด / ไม่ผ่านการตรวจ (ฝ่าฝืนข้อห้ามความปลอดภัย)': 'A',
+  'แอบใช้อุปกรณ์ชำรุด / ไม่ผ่านการตรวจ (ฝ่าฝืนข้อห้ามความปลอดภัย)': 'A'
+};
+
+const DEFECT_POINTS_MAP = {
+  'A': 10,
+  'B': 5,
+  'C': 2
+};
+
+function autoSelectSeverityByDefect() {
+  const defectSelect = document.getElementById('p-defect');
+  const severitySelect = document.getElementById('p-severity');
+  if (!defectSelect || !severitySelect) return;
+
+  const defectVal = defectSelect.value;
+  const targetLevel = DEFECT_SEVERITY_MAP[defectVal] || 'B';
+
+  for (let i = 0; i < severitySelect.options.length; i++) {
+    const optVal = severitySelect.options[i].value;
+    if (optVal === targetLevel || optVal === (targetLevel === 'A' ? 'สูง' : (targetLevel === 'B' ? 'กลาง' : 'ต่ำ'))) {
+      severitySelect.selectedIndex = i;
+      break;
+    }
+  }
+}
+
+// 4.2 ระบบคำนวณ Safety Scorecard แบบเป็นธรรม (Normalized Compliance Rate %)
+function calculateContractorSafetyScore(companyName) {
+  const compEq = (appState.equipment || []).filter(eq => eq['บริษัทผู้รับเหมา'] === companyName);
+  const compPatrols = (appState.patrolLogs || []).filter(log => log['ผู้รับเหมา'] === companyName);
+
+  let passedEq = 0;
+  let defectiveEq = 0;
+  compEq.forEach(eq => {
+    if (checkEquipmentExpired(eq['วันหมดอายุ Tag']) || checkEquipmentDefective(eq['หมายเลขซีเรียล'])) {
+      defectiveEq++;
+    } else {
+      passedEq++;
+    }
+  });
+
+  let rawPatrolDeductions = 0;
+  let capaBonus = 0;
+
+  compPatrols.forEach(log => {
+    const defectType = String(log['ข้อบกพร่อง'] || log['ประเภทข้อบกพร่องความปลอดภัย'] || '').trim();
+    const severity = String(log['ระดับความรุนแรง'] || DEFECT_SEVERITY_MAP[defectType] || 'C').trim().toUpperCase();
+    const isClosed = log['สถานะ CAPA'] === 'ปิดเคสแล้ว';
+    
+    let baseDeduct = DEFECT_POINTS_MAP[defectType] || DEFECT_POINTS_MAP[severity] || (severity === 'A' || severity === 'สูง' ? 10 : (severity === 'B' || severity === 'กลาง' ? 5 : 2));
+    
+    rawPatrolDeductions += baseDeduct;
+    if (isClosed) {
+      capaBonus += Math.round(baseDeduct * 0.5);
+    }
+  });
+
+  const eqDeductions = defectiveEq * 5;
+  const netPatrolDeductions = rawPatrolDeductions - capaBonus;
+  const totalPointsDeducted = Math.max(0, netPatrolDeductions + eqDeductions);
+
+  // คำนวณปริมาณงานทั้งหมด (Total Volume of Activity) เพื่อปรับคะแนนให้เป็นธรรมกับผู้รับเหมาที่มีกิจกรรมเยอะ
+  const totalVolume = compEq.length + compPatrols.length;
+  const effectiveVolume = Math.max(1, totalVolume);
+
+  // Compliance Rate % Formula = 100 - ((แต้มหักรวม / จำนวนการตรวจและอุปกรณ์) * 10)
+  const violationDensity = totalPointsDeducted / effectiveVolume;
+  const finalScore = Math.max(0, Math.min(100, Math.round(100 - (violationDensity * 10))));
+
+  const totalDefects = compPatrols.length;
+  const closedDefects = compPatrols.filter(l => l['สถานะ CAPA'] === 'ปิดเคสแล้ว').length;
+  const capaRate = totalDefects > 0 ? Math.round((closedDefects / totalDefects) * 100) : 100;
+  const passRate = compEq.length > 0 ? Math.round((passedEq / compEq.length) * 100) : 100;
+
+  let gradeText = 'เกณฑ์ดีเยี่ยม (Grade A)';
+  let badgeClass = 'active';
+  if (finalScore < 60) {
+    gradeText = 'ไม่ผ่านเกณฑ์ (Grade F)';
+    badgeClass = 'inactive';
+  } else if (finalScore < 75) {
+    gradeText = 'ต้องเฝ้าระวัง (Grade C)';
+    badgeClass = 'pending';
+  } else if (finalScore < 90) {
+    gradeText = 'ผ่านเกณฑ์ (Grade B)';
+    badgeClass = 'active';
+  }
+
+  return {
+    companyName: companyName,
+    finalScore: finalScore,
+    pointsDeducted: totalPointsDeducted,
+    rawPatrolDeductions: rawPatrolDeductions,
+    capaBonus: capaBonus,
+    eqDeductions: eqDeductions,
+    totalDefects: totalDefects,
+    closedDefects: closedDefects,
+    capaRate: capaRate,
+    passRate: passRate,
+    passedEq: passedEq,
+    defectiveEq: defectiveEq,
+    totalEq: compEq.length,
+    gradeText: gradeText,
+    badgeClass: badgeClass,
+    effectiveVolume: effectiveVolume,
+    violationDensity: violationDensity
+  };
+}
+
+function openScoreFormulaModal(companyName) {
+  if (!companyName) {
+    companyName = window.activeContractorProfileName;
+  }
+  if (!companyName && appState.contractors && appState.contractors.length > 0) {
+    companyName = appState.contractors[0]['ชื่อบริษัท'];
+  }
+  if (!companyName) return;
+
+  window.activeContractorProfileName = companyName;
+  const sc = calculateContractorSafetyScore(companyName);
+
+  document.getElementById('sf-company-name').innerText = `บริษัทผู้รับเหมา: ${sc.companyName}`;
+  document.getElementById('sf-grade-summary').innerText = `เกรดประเมินสรุป: ${sc.gradeText} (${sc.finalScore}/100 คะแนน)`;
+
+  const detailsContainer = document.getElementById('sf-breakdown-details');
+  if (detailsContainer) {
+    detailsContainer.innerHTML = `
+      <div style="display: flex; justify-content: space-between; padding: 8px 12px; background: #fff; border: 1px solid #e2e8f0; border-radius: 6px;">
+        <span>1. คะแนนตั้งต้น (Base Score)</span>
+        <strong style="color: #2563eb;">100.0 คะแนน</strong>
+      </div>
+      <div style="display: flex; justify-content: space-between; padding: 8px 12px; background: #fff; border: 1px solid #e2e8f0; border-radius: 6px;">
+        <span>2. แต้มหักจากเคสเดินตรวจ (${sc.totalDefects} เคส)</span>
+        <strong style="color: var(--danger-color);">-${sc.rawPatrolDeductions} แต้ม</strong>
+      </div>
+      <div style="display: flex; justify-content: space-between; padding: 8px 12px; background: #fff; border: 1px solid #e2e8f0; border-radius: 6px;">
+        <span>3. แต้มได้รับคืนจากการปิดเคส CAPA (${sc.closedDefects} เคส)</span>
+        <strong style="color: var(--success-color);">+${sc.capaBonus} แต้ม (โบนัสคืน 50%)</strong>
+      </div>
+      <div style="display: flex; justify-content: space-between; padding: 8px 12px; background: #fff; border: 1px solid #e2e8f0; border-radius: 6px;">
+        <span>4. แต้มหักอุปกรณ์ชำรุด/หมดอายุ Tag 30 วัน (${sc.defectiveEq} ชิ้น)</span>
+        <strong style="color: var(--danger-color);">-${sc.eqDeductions} แต้ม</strong>
+      </div>
+      <div style="display: flex; justify-content: space-between; padding: 8px 12px; background: #fff3e0; border: 1px solid #ffe0b2; border-radius: 6px;">
+        <span>5. แต้มหักสุทธิรวมทั้งหมด (Total Deductions)</span>
+        <strong style="color: #c62828;">-${sc.pointsDeducted} แต้ม</strong>
+      </div>
+      <div style="display: flex; justify-content: space-between; padding: 8px 12px; background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 6px;">
+        <span>6. ปริมาณงานทั้งหมด (${sc.totalEq} อุปกรณ์ + ${sc.totalDefects} เคสตรวจ)</span>
+        <strong style="color: var(--primary-color);">${sc.effectiveVolume} หน่วยงาน</strong>
+      </div>
+      <div style="display: flex; justify-content: space-between; padding: 8px 12px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 6px;">
+        <span>7. อัตราความผิดต่อหน่วยงาน (${sc.pointsDeducted} ÷ ${sc.effectiveVolume})</span>
+        <strong>${sc.violationDensity.toFixed(3)}</strong>
+      </div>
+      <div style="display: flex; justify-content: space-between; padding: 10px 12px; background: #e8f5e9; border: 1px solid #a5d6a7; border-radius: 6px; margin-top: 4px;">
+        <span style="font-weight: bold; color: #2e7d32;">คะแนนคงเหลือสุทธิ = 100 - (${sc.violationDensity.toFixed(3)} × 10)</span>
+        <strong style="font-size: 16px; color: #2e7d32;">${sc.finalScore} คะแนน</strong>
+      </div>
+    `;
+  }
+
+  openModal('score-formula-modal');
+}
+
 
 // 5. ข้อมูลจำลองผู้รับผิดชอบแต่ละพื้นที่ (สำหรับโหมดออฟไลน์ / ค่าเริ่มต้น)
 const DEFAULT_AREA_MAPPING = [
@@ -126,42 +306,44 @@ document.addEventListener('DOMContentLoaded', () => {
 // จัดการหน้าจอย้ายแถบเมนู (Sidebar Navigation)
 function setupNavigation() {
   const navItems = document.querySelectorAll('.nav-item');
-  const panels = document.querySelectorAll('.module-panel');
-  
   navItems.forEach(item => {
     item.addEventListener('click', () => {
-      // เอา active เก่าออก ใส่ใหม่
-      navItems.forEach(nav => nav.classList.remove('active'));
-      item.classList.add('active');
-      
-      // สลับหน้าจอ panel
       const targetPanel = item.getAttribute('data-target');
-      panels.forEach(panel => {
-        panel.classList.remove('active');
-        if (panel.id === targetPanel) {
-          panel.classList.add('active');
-        }
-      });
-      
-      // ปรับปรุงหัวเรื่องของหน้า
-      updateHeaderTitle(targetPanel);
-      
-      // หากอยู่ในจอ Dashboard ให้เรนเดอร์กราฟใหม่
-      if (targetPanel === 'dashboard-panel') {
-        renderDashboardCharts();
-      }
-      
-      // หากเข้าหน้าจออบรม
-      if (targetPanel === 'training-panel') {
-        loadTrainingData();
-      }
-      
-      // ย่อเก็บเมนูสำหรับหน้าจอมือถืออัตโนมัติ
-      if (window.innerWidth <= 900) {
-        document.getElementById('sidebar').classList.remove('open');
-      }
+      switchPanel(targetPanel);
     });
   });
+}
+
+function switchPanel(targetPanelId) {
+  const navItems = document.querySelectorAll('.nav-item');
+  const panels = document.querySelectorAll('.module-panel');
+  
+  navItems.forEach(nav => {
+    if (nav.getAttribute('data-target') === targetPanelId) {
+      nav.classList.add('active');
+    } else {
+      nav.classList.remove('active');
+    }
+  });
+
+  panels.forEach(panel => {
+    if (panel.id === targetPanelId) {
+      panel.classList.add('active');
+    } else {
+      panel.classList.remove('active');
+    }
+  });
+
+  updateHeaderTitle(targetPanelId);
+
+  if (targetPanelId === 'dashboard-panel') {
+    renderDashboardCharts();
+  }
+
+  if (window.innerWidth <= 900) {
+    const sidebar = document.getElementById('sidebar');
+    if (sidebar) sidebar.classList.remove('open');
+  }
 }
 
 function updateHeaderTitle(panelId) {
@@ -252,6 +434,56 @@ function renderFormDropdowns() {
 
     const configDefectTypes = [...new Set(appState.areaMapping.map(item => item['ประเภทข้อบกพร่องความปลอดภัย']).filter(Boolean))];
     if (configDefectTypes.length > 0) appState.defectTypes = configDefectTypes;
+
+    // สกัดระดับความรุนแรงและคะแนนหักแบบไดนามิกจาก Config Sheet (รองรับทั้งแมปเป็นรายข้อบกพร่อง และตารางแมปเกรด A/B/C ใน Column N & O)
+    appState.areaMapping.forEach(item => {
+      const defectName = item['ประเภทข้อบกพร่องความปลอดภัย'];
+      const sev = item['ระดับความรุนแรงข้อบกพร่อง'] || item['ระดับความรุนแรง'] || item['ระดับ (A/B/C)'] || item['ระดับ'];
+      const pts = item['คะแนนหักข้อบกพร่อง'] || item['คะแนนหัก'] || item['แต้มหัก'];
+      
+      // แมปเกรด (เช่น A, B, C, D...) กับคะแนนหักจาก Column N & O แบบไดนามิก 100%
+      if (sev && pts && !isNaN(parseInt(pts))) {
+        const cleanGrade = String(sev).trim().toUpperCase();
+        if (cleanGrade && cleanGrade.length <= 5) {
+          const mappedKey = (cleanGrade === 'สูง' ? 'A' : (cleanGrade === 'กลาง' ? 'B' : (cleanGrade === 'ต่ำ' ? 'C' : cleanGrade)));
+          DEFECT_POINTS_MAP[mappedKey] = parseInt(pts);
+        }
+      }
+
+      // แมปรายข้อบกพร่องกับระดับความรุนแรง
+      if (defectName && String(defectName).trim()) {
+        const cleanName = String(defectName).trim();
+        if (sev && String(sev).trim() && String(sev).trim().length <= 3) {
+          DEFECT_SEVERITY_MAP[cleanName] = String(sev).trim().toUpperCase();
+        }
+        if (pts && !isNaN(parseInt(pts)) && defectName) {
+          DEFECT_POINTS_MAP[cleanName] = parseInt(pts);
+        }
+      }
+    });
+
+    // สกัด PIN จป. แต่ละคน และ Admin PIN จาก Config
+    appState.inspectorPins = {};
+    appState.areaMapping.forEach(item => {
+      const name = item['รายชื่อ จป.ผู้ตรวจ'] || item['รายชื่อ จป. ผู้ตรวจ'];
+      const pin = item['รหัส PIN'] || item['PIN'];
+      if (name && pin) {
+        appState.inspectorPins[String(name).trim()] = String(pin).trim();
+      }
+      if (item['Admin PIN']) {
+        appState.adminPin = String(item['Admin PIN']).trim();
+      }
+    });
+
+    // สกัด Site โรงงานจาก Column L
+    const sites = [...new Set(appState.areaMapping.map(item => item['Site โรงงาน'] || item['Site'] || item['โรงงาน']).filter(Boolean))];
+    if (sites.length > 0) {
+      appState.sites = sites;
+    } else {
+      appState.sites = ['โรงงาน 1', 'โรงงาน 2', 'โรงงาน 3'];
+    }
+  } else {
+    appState.sites = ['โรงงาน 1', 'โรงงาน 2', 'โรงงาน 3'];
   }
 
   // 1. Dropdown ชื่ออุปกรณ์
@@ -289,6 +521,29 @@ function renderFormDropdowns() {
     const ppeTypes = [...new Set(appState.areaMapping.map(item => item['ประเภทอุปกรณ์ PPE']).filter(Boolean))];
     ppeSelect.innerHTML = '<option value="">-- เลือกประเภทอุปกรณ์ PPE --</option>' + 
       ppeTypes.map(name => `<option value="${name}">${name}</option>`).join('');
+  }
+
+  // 6. Dropdown Site โรงงาน (Dashboard Filter & Equipment Registration)
+  const siteFilterSelect = document.getElementById('dashboard-site-filter');
+  if (siteFilterSelect && appState.sites) {
+    const currentVal = siteFilterSelect.value || 'ALL';
+    siteFilterSelect.innerHTML = '<option value="ALL">-- แสดงทุก Site / โรงงาน --</option>' +
+      appState.sites.map(s => `<option value="${s}">${s}</option>`).join('');
+    siteFilterSelect.value = currentVal;
+  }
+
+  const eqSiteSelect = document.getElementById('eq-site');
+  if (eqSiteSelect && appState.sites) {
+    eqSiteSelect.innerHTML = appState.sites.map(s => `<option value="${s}">${s}</option>`).join('');
+  }
+
+  // 7. Dropdown ผู้ดำเนินการ PIN Modal
+  const pinInspectorSelect = document.getElementById('pin-inspector-select');
+  if (pinInspectorSelect && appState.areaMapping) {
+    const inspectors = [...new Set(appState.areaMapping.map(item => item['รายชื่อ จป.ผู้ตรวจ'] || item['รายชื่อ จป. ผู้ตรวจ']).filter(Boolean))];
+    pinInspectorSelect.innerHTML = '<option value="">-- เลือก จป. ผู้ตรวจ หรือ Admin --</option>' +
+      '<option value="ADMIN">🔐 Admin System</option>' +
+      inspectors.map(name => `<option value="${name}">${name}</option>`).join('');
   }
 }
 
@@ -503,6 +758,27 @@ function saveLocalAction(action, payload) {
       }
       localStorage.setItem('cached_patrolLogs', JSON.stringify(list));
     }
+  } else if (action === 'deleteContractor') {
+    let list = JSON.parse(localStorage.getItem('cached_contractors')) || [];
+    list = list.filter(c => c['ชื่อบริษัท'] !== payload.targetId && c['ชื่อบริษัท'] !== payload.companyName);
+    localStorage.setItem('cached_contractors', JSON.stringify(list));
+  } else if (action === 'deleteEquipment') {
+    let list = JSON.parse(localStorage.getItem('cached_equipment')) || [];
+    list = list.filter(e => e['ID'] !== payload.targetId && e['ID'] !== payload.id);
+    localStorage.setItem('cached_equipment', JSON.stringify(list));
+  } else if (action === 'bulkDeleteEquipment') {
+    let list = JSON.parse(localStorage.getItem('cached_equipment')) || [];
+    const ids = (payload.targetId || '').split(',');
+    list = list.filter(e => !ids.includes(e['ID']));
+    localStorage.setItem('cached_equipment', JSON.stringify(list));
+  } else if (action === 'deletePatrolLog') {
+    let list = JSON.parse(localStorage.getItem('cached_patrolLogs')) || [];
+    list = list.filter(l => l['ID'] !== payload.targetId && l['ID'] !== payload.id);
+    localStorage.setItem('cached_patrolLogs', JSON.stringify(list));
+  } else if (action === 'deleteInspectionLog') {
+    let list = JSON.parse(localStorage.getItem('cached_inspectionLogs')) || [];
+    list = list.filter(l => l['ID'] !== payload.targetId && l['ID'] !== payload.id);
+    localStorage.setItem('cached_inspectionLogs', JSON.stringify(list));
   }
 }
 
@@ -537,6 +813,12 @@ function openModal(id) {
   if (id === 'add-patrol-modal') {
     document.getElementById('p-date').valueAsDate = new Date();
     
+    // อัปเดต Dropdown Site โรงงาน
+    const pSiteSelect = document.getElementById('p-site');
+    if (pSiteSelect && appState.sites) {
+      pSiteSelect.innerHTML = appState.sites.map(s => `<option value="${s}">${s}</option>`).join('');
+    }
+
     // อัปเดตDropdownผู้รับเหมาในเดินตรวจ
     const activeContractors = appState.contractors.filter(c => c['สถานะ'] === 'ใช้งานอยู่');
     document.getElementById('p-contractor').innerHTML = '<option value="">-- เลือกบริษัทผู้รับเหมา --</option>' +
@@ -545,8 +827,10 @@ function openModal(id) {
     // อัปเดตDropdownพื้นที่ตรวจด้วย
     updatePatrolAreas();
     
-    // เติม Dropdown ผู้ควบคุมงานโครงการ (Project Supervisor)
-    const supervisors = [...new Set(appState.areaMapping.map(item => item['ผู้ควบคุมงานโครงการ']).filter(Boolean))];
+    // เติม Dropdown ผู้ควบคุมงานโครงการ (Project Supervisor) จาก Config Column E
+    const supervisors = [...new Set(appState.areaMapping.map(item => 
+      item['ผู้ควบคุมงานโครงการ'] || item['ชื่อ-นามสกุล ผู้ควบคุมงาน'] || item['ผู้ควบคุมงาน'] || item['ชื่อผู้ควบคุมงาน'] || item['Project Supervisor'] || item['Supervisor']
+    ).filter(Boolean))];
     document.getElementById('p-project-supervisor').innerHTML = '<option value="">-- เลือกผู้ควบคุมงานโครงการ --</option>' +
       supervisors.map(name => `<option value="${name}">${name}</option>`).join('');
     
@@ -692,6 +976,7 @@ async function saveEquipment(e) {
   const name = document.getElementById('eq-name').value;
   const serial = document.getElementById('eq-serial').value.trim();
   const contractor = document.getElementById('eq-contractor').value;
+  const site = document.getElementById('eq-site') ? document.getElementById('eq-site').value : '';
   const area = document.getElementById('eq-area').value;
   const date = document.getElementById('eq-date').value;
   const expiry = document.getElementById('eq-expiry').value;
@@ -702,6 +987,8 @@ async function saveEquipment(e) {
     equipmentName: name,
     serialNumber: serial,
     contractor: contractor,
+    site: site,
+    'Site โรงงาน': site,
     area: area,
     inspectionDate: date,
     expiryDate: expiry,
@@ -729,6 +1016,7 @@ async function savePatrol(e) {
   const date = document.getElementById('p-date').value;
   const inspector = document.getElementById('p-inspector').value;
   const contractor = document.getElementById('p-contractor').value;
+  const site = document.getElementById('p-site') ? document.getElementById('p-site').value : '';
   const area = document.getElementById('p-area').value;
   const projectSupervisor = document.getElementById('p-project-supervisor').value;
   const defect = document.getElementById('p-defect').value;
@@ -749,6 +1037,8 @@ async function savePatrol(e) {
     date: date,
     inspector: inspector,
     contractor: contractor,
+    site: site,
+    'Site โรงงาน': site,
     area: area,
     projectSupervisor: projectSupervisor,
     defectType: defect + (qrRef ? ` (สแกนซีเรียลอุปกรณ์: ${qrRef})` : ''),
@@ -756,8 +1046,20 @@ async function savePatrol(e) {
     beforeImage: beforeImage,
     capaStatus: capaStatus,
     details: details,
-    department: document.getElementById('p-dept').value
+    department: document.getElementById('p-dept').value,
+    qrRef: qrRef,
+    equipmentId: qrRef,
+    serialNumber: qrRef
   };
+
+  if (qrRef) {
+    const targetEq = (appState.equipment || []).find(e => 
+      e['ID'] === qrRef || e['หมายเลขซีเรียล'] === qrRef || (e['ID'] && e['ID'].indexOf(qrRef) !== -1)
+    );
+    if (targetEq) {
+      targetEq['สถานะอุปกรณ์'] = 'ชำรุด';
+    }
+  }
   
   closeModal('add-patrol-modal');
   const success = await sendActionToServer('addPatrolLog', payload);
@@ -795,14 +1097,17 @@ function handleImageUpload(event, previewId, base64HiddenId) {
   const file = event.target.files[0];
   if (!file) return;
   
-  const reader = new FileReader();
-  reader.onload = function(e) {
+  compressImage(file, 1024, 0.75, function(compressedBase64) {
     const preview = document.getElementById(previewId);
-    preview.src = e.target.result;
-    preview.style.display = 'block';
-    document.getElementById(base64HiddenId).value = e.target.result;
-  };
-  reader.readAsDataURL(file);
+    if (preview) {
+      preview.src = compressedBase64;
+      preview.style.display = 'block';
+    }
+    const hiddenInput = document.getElementById(base64HiddenId);
+    if (hiddenInput) {
+      hiddenInput.value = compressedBase64;
+    }
+  });
 }
 
 // --- บันทึกส่งใบงานแก้ไข CAPA ปิดเคส ---
@@ -914,13 +1219,35 @@ function renderEquipmentTable() {
   
   tbody.innerHTML = '';
   mobileCards.innerHTML = '';
+
+  const statusFilter = document.getElementById('eq-status-filter')?.value || 'ปกติ';
+  const siteFilter = document.getElementById('dashboard-site-filter')?.value || 'ALL';
+
+  let list = appState.equipment || [];
+
+  // กรองตาม Site หากมีการเลือก
+  if (siteFilter !== 'ALL') {
+    list = list.filter(e => e['Site โรงงาน'] === siteFilter || e['Site'] === siteFilter || e['โรงงาน'] === siteFilter);
+  }
+
+  // กรองตามสถานะอุปกรณ์ (ปกติ, ชำรุด, หมดอายุ, ทั้งหมด)
+  if (statusFilter !== 'ALL') {
+    list = list.filter(e => {
+      const isExpired = checkEquipmentExpired(e['วันหมดอายุ Tag']);
+      const isDefective = checkEquipmentDefective(e['หมายเลขซีเรียล']);
+      if (statusFilter === 'ปกติ') return !isExpired && !isDefective;
+      if (statusFilter === 'ชำรุด') return isDefective;
+      if (statusFilter === 'หมดอายุ') return isExpired;
+      return true;
+    });
+  }
   
-  if (appState.equipment.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: #78909c;">ไม่มีข้อมูลอุปกรณ์ที่ขึ้นทะเบียน</td></tr>';
+  if (list.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: #78909c;">ไม่พบข้อมูลอุปกรณ์ตามเงื่อนไขการกรอง</td></tr>';
     return;
   }
   
-  appState.equipment.forEach(e => {
+  list.forEach(e => {
     // หาสีเพื่อใส่จุดสี
     const inspDate = new Date(e['วันที่ตรวจสอบ']);
     const month = inspDate.getMonth();
@@ -946,6 +1273,8 @@ function renderEquipmentTable() {
       ? `<img src="${getDirectDriveImageUrl(e['รูปภาพอุปกรณ์'])}" style="width: 36px; height: 27px; object-fit: cover; border-radius: 4px; vertical-align: middle; margin-right: 8px; cursor: pointer;" onclick="showLightbox('${getDirectDriveImageUrl(e['รูปภาพอุปกรณ์'])}')">` 
       : `<i class="fa-solid fa-screwdriver-wrench" style="color: #78909c; margin-right: 8px; font-size: 14px; vertical-align: middle;"></i>`;
       
+    const siteVal = e['Site โรงงาน'] || e['Site'] || e['โรงงาน'] || 'โรงงาน 1';
+
     tr.innerHTML = `
       <td style="text-align: center;"><input type="checkbox" class="eq-row-checkbox" value="${e['ID']}" onchange="updateEqBulkPrintButtonVisibility()"></td>
       <td style="font-weight: 600;">
@@ -955,6 +1284,7 @@ function renderEquipmentTable() {
         </div>
       </td>
       <td>${e['หมายเลขซีเรียล']}</td>
+      <td><span class="status-badge active" style="background-color: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; font-weight: 600;"><i class="fa-solid fa-industry"></i> ${siteVal}</span></td>
       <td>${e['บริษัทผู้รับเหมา']}</td>
       <td>${formatThaiDate(e['วันที่ตรวจสอบ'])}</td>
       <td>
@@ -965,9 +1295,17 @@ function renderEquipmentTable() {
         ${e['สีป้ายประจำเดือน'] || 'ไม่ได้ระบุ'}
       </td>
       <td>
-        <button class="btn btn-outline" style="padding: 4px 8px; font-size: 11px;" onclick="printStickerTag('${e['ID']}')">
-          <i class="fa-solid fa-print"></i> Print Tag
-        </button>
+        <div style="display: flex; gap: 4px;">
+          <button class="btn btn-outline" style="padding: 4px 8px; font-size: 11px; border-color: var(--primary-color); color: var(--primary-color);" onclick="renewEquipmentTag('${e['ID'] || e['หมายเลขซีเรียล']}')" title="ต่ออายุป้าย Tag 30 วัน (สำหรับ จป.)">
+            <i class="fa-solid fa-arrows-rotate"></i>
+          </button>
+          <button class="btn btn-outline" style="padding: 4px 8px; font-size: 11px;" onclick="printStickerTag('${e['ID'] || e['หมายเลขซีเรียล']}')" title="พิมพ์ป้าย">
+            <i class="fa-solid fa-print"></i>
+          </button>
+          <button class="btn btn-outline-danger" style="padding: 4px 8px; font-size: 11px; border-color: var(--danger-color); color: var(--danger-color);" onclick="openPinModal('deleteEquipment', '${e['ID'] || e['หมายเลขซีเรียล']}')" title="ลบอุปกรณ์">
+            <i class="fa-solid fa-trash"></i>
+          </button>
+        </div>
       </td>
     `;
     tbody.appendChild(tr);
@@ -978,14 +1316,21 @@ function renderEquipmentTable() {
     card.innerHTML = `
       ${hasPhoto ? `<div style="text-align: center; margin-bottom: 10px;"><img src="${getDirectDriveImageUrl(e['รูปภาพอุปกรณ์'])}" style="width: 100%; max-height: 150px; object-fit: cover; border-radius: 6px;" onclick="showLightbox('${getDirectDriveImageUrl(e['รูปภาพอุปกรณ์'])}')"></div>` : ''}
       <div style="font-weight: bold; font-size: 15px; margin-bottom: 8px;">${e['ชื่ออุปกรณ์']} (${e['หมายเลขซีเรียล']})</div>
+      <div style="font-size: 13px; margin-bottom: 4px;"><strong>Site / โรงงาน:</strong> <span class="status-badge active" style="background-color: #e0f2fe; color: #0369a1; font-weight: 600;">${siteVal}</span></div>
       <div style="font-size: 13px; margin-bottom: 4px;"><strong>ผู้รับเหมา:</strong> ${e['บริษัทผู้รับเหมา']}</div>
       <div style="font-size: 13px; margin-bottom: 4px;"><strong>หมดอายุ:</strong> <span class="status-badge ${labelClass}">${formatThaiDate(e['วันหมดอายุ Tag'])}</span></div>
       <div style="font-size: 13px; margin-bottom: 8px;">
         <strong>ป้ายสี:</strong> <span class="color-dot" style="background-color: ${colorHex};"></span> ${e['สีป้ายประจำเดือน']}
       </div>
-      <div style="text-align: right; border-top: 1px solid #eee; padding-top: 8px;">
+      <div style="display: flex; justify-content: space-between; border-top: 1px solid #eee; padding-top: 8px;">
+        <button class="btn btn-outline-danger" style="padding: 6px 12px; font-size: 12px; border-color: var(--danger-color); color: var(--danger-color);" onclick="openPinModal('deleteEquipment', '${e['ID'] || e['หมายเลขซีเรียล']}')">
+          <i class="fa-solid fa-trash"></i> ลบ
+        </button>
+        <button class="btn btn-outline" style="padding: 6px 12px; font-size: 12px; border-color: var(--primary-color); color: var(--primary-color);" onclick="renewEquipmentTag('${e['ID'] || e['หมายเลขซีเรียล']}')">
+          <i class="fa-solid fa-arrows-rotate"></i> ต่ออายุ
+        </button>
         <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 12px;" onclick="printStickerTag('${e['ID']}')">
-          <i class="fa-solid fa-print"></i> พิมพ์ป้ายสติกเกอร์
+          <i class="fa-solid fa-print"></i> พิมพ์ป้าย
         </button>
       </div>
     `;
@@ -1000,10 +1345,27 @@ function checkEquipmentExpired(expiryDateStr) {
   return today > expiry;
 }
 
-function checkEquipmentDefective(serial) {
-  // กรองดูจากตารางบันทึกความผิด (เมนู 3) ว่ามีอุปกรณ์ซีเรียลนี้ชำรุดและยังไม่ได้แก้ (Pending) หรือไม่
-  return appState.patrolLogs.some(log => 
-    log['ข้อบกพร่อง'].indexOf(serial) > -1 && 
+function checkEquipmentDefective(serialOrId) {
+  if (!serialOrId) return false;
+  const target = String(serialOrId).trim();
+  
+  // 1. ตรวจดูในตาราง Equipment ว่าคอลัมน์สถานะเป็น ชำรุด หรือ ห้ามใช้งาน หรือไม่
+  const eqItem = (appState.equipment || []).find(e => 
+    (e['ID'] && String(e['ID']).trim() === target) || 
+    (e['หมายเลขซีเรียล'] && String(e['หมายเลขซีเรียล']).trim() === target)
+  );
+  if (eqItem) {
+    const statusVal = String(eqItem['สถานะอุปกรณ์'] || eqItem['สถานะ'] || '').trim();
+    if (statusVal.indexOf('ชำรุด') !== -1 || statusVal.indexOf('ห้ามใช้') !== -1 || statusVal.indexOf('ไม่ผ่าน') !== -1) {
+      return true;
+    }
+  }
+
+  // 2. กรองดูจากตารางบันทึกความผิด (Patrol Logs) ว่ามีอุปกรณ์นี้ชำรุดและยังไม่ได้แก้ (Pending CAPA) หรือไม่
+  return (appState.patrolLogs || []).some(log => 
+    ((log['ข้อบกพร่อง'] && log['ข้อบกพร่อง'].indexOf(target) > -1) ||
+     (log['รายละเอียด'] && log['รายละเอียด'].indexOf(target) > -1) ||
+     (log['ID'] && String(log['ID']).trim() === target)) && 
     log['สถานะ CAPA'] === 'รอดำเนินการ CAPA'
   );
 }
@@ -1068,11 +1430,17 @@ function renderPatrolLogsTable() {
       imagesHtml += ` <img src="${afterUrl}" class="ba-img" onclick="showLightbox('${afterUrl}')" title="หลังแก้ไข">`;
     }
     
+    const inspectorName = log['ผู้ตรวจบันทึก'] || log['ผู้ตรวจสอบ'] || log['inspector'] || '-';
+    const siteName = log['Site โรงงาน'] || log['Site'] || log['โรงงาน'] || 'โรงงาน 1';
+    const areaName = log['พื้นที่'] || '-';
+
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td>${formatThaiDate(log['วันที่'])}</td>
       <td><a href="#" onclick="openContractorProfile('${log['ผู้รับเหมา']}'); event.preventDefault();" style="font-weight: 600; color: var(--primary-color); text-decoration: none;">${log['ผู้รับเหมา']}</a></td>
-      <td>${log['พื้นที่']}</td>
+      <td>${areaName}</td>
+      <td><span class="status-badge active" style="background-color: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; font-weight: 600;"><i class="fa-solid fa-industry"></i> ${siteName}</span></td>
+      <td><span class="status-badge active" style="background-color: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; font-weight: 600;"><i class="fa-solid fa-user-shield"></i> ${inspectorName}</span></td>
       <td>${log['ข้อบกพร่อง']}</td>
       <td>${severityHtml}</td>
       <td>
@@ -1085,7 +1453,14 @@ function renderPatrolLogsTable() {
           ${log['สถานะ CAPA']}
         </span>
       </td>
-      <td>${actionButtonHtml}</td>
+      <td>
+        <div style="display: flex; gap: 4px; align-items: center;">
+          ${actionButtonHtml}
+          <button class="btn btn-outline-danger" style="padding: 4px 8px; font-size: 11px; border-color: var(--danger-color); color: var(--danger-color);" onclick="openPinModal('deletePatrolLog', '${log['ID']}')" title="ลบเคสเดินตรวจ (Admin Only)">
+            <i class="fa-solid fa-trash"></i>
+          </button>
+        </div>
+      </td>
     `;
     tbody.appendChild(tr);
     
@@ -1095,10 +1470,12 @@ function renderPatrolLogsTable() {
     card.innerHTML = `
       <div style="display: flex; justify-content: space-between; font-size: 12px; color: #78909c; margin-bottom: 8px;">
         <span>${formatThaiDate(log['วันที่'])}</span>
-        <span>พื้นที่: ${log['พื้นที่']}</span>
+        <span>พื้นที่: ${areaName}</span>
       </div>
       <div style="font-weight: bold; font-size: 14px; margin-bottom: 4px;">${log['ข้อบกพร่อง']}</div>
       <div style="font-size: 13px; margin-bottom: 4px;"><strong>ผู้รับเหมา:</strong> ${log['ผู้รับเหมา']}</div>
+      <div style="font-size: 13px; margin-bottom: 4px;"><strong>Site / โรงงาน:</strong> <span class="status-badge active" style="background-color: #e0f2fe; color: #0369a1; font-weight: 600;">${siteName}</span></div>
+      <div style="font-size: 13px; margin-bottom: 4px;"><strong>จป. ผู้ตรวจบันทึก:</strong> <span style="font-weight: 600; color: #475569;"><i class="fa-solid fa-user-shield"></i> ${inspectorName}</span></div>
       <div style="font-size: 13px; margin-bottom: 6px;">
         <strong>ความรุนแรง:</strong> ${severityHtml} | 
         <strong>สถานะ:</strong> <span class="status-badge ${statusClass}">${log['สถานะ CAPA']}</span>
@@ -1107,13 +1484,16 @@ function renderPatrolLogsTable() {
         ${log['ภาพ Before'] && log['ภาพ Before'] !== '-' ? `<div><span style="font-size:10px; display:block; color:#777;">Before:</span><img src="${getDirectDriveImageUrl(log['ภาพ Before'])}" style="width: 60px; height: 45px; object-fit: cover; border-radius: 4px;" onclick="showLightbox('${getDirectDriveImageUrl(log['ภาพ Before'])}')"></div>` : ''}
         ${log['ภาพ After'] && log['ภาพ After'] !== '-' ? `<div><span style="font-size:10px; display:block; color:#777;">After:</span><img src="${getDirectDriveImageUrl(log['ภาพ After'])}" style="width: 60px; height: 45px; object-fit: cover; border-radius: 4px;" onclick="showLightbox('${getDirectDriveImageUrl(log['ภาพ After'])}')"></div>` : ''}
       </div>
-      ${log['สถานะ CAPA'] === 'รอดำเนินการ CAPA' ? `
-        <div style="text-align: right; border-top: 1px solid #eee; padding-top: 8px;">
+      <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid #eee; padding-top: 8px;">
+        <button class="btn btn-outline-danger" style="padding: 6px 12px; font-size: 12px; border-color: var(--danger-color); color: var(--danger-color);" onclick="openPinModal('deletePatrolLog', '${log['ID']}')">
+          <i class="fa-solid fa-trash"></i> ลบเคส
+        </button>
+        ${log['สถานะ CAPA'] === 'รอดำเนินการ CAPA' ? `
           <button class="btn btn-secondary" style="padding: 6px 12px; font-size: 12px; background-color: var(--warning-color); color: #fff;" onclick="openCapaActionModal('${log['ID']}')">
-            <i class="fa-solid fa-wrench"></i> จัดการเคสคงค้าง
+            <i class="fa-solid fa-wrench"></i> ติดตามเคสคงค้าง
           </button>
-        </div>
-      ` : ''}
+        ` : ''}
+      </div>
     `;
     mobileCards.appendChild(card);
   });
@@ -1156,6 +1536,7 @@ function showLightbox(src) {
 
 // --- ฟังก์ชั่นเปิดโปรไฟล์สรุปประวัติผู้รับเหมาสะสมย้อนหลัง (เมื่อคลิกที่ชื่อบริษัท) ---
 function openContractorProfile(companyName) {
+  window.activeContractorProfileName = companyName;
   const c = appState.contractors.find(item => item['ชื่อบริษัท'] === companyName);
   if (!c) return;
   
@@ -1168,7 +1549,26 @@ function openContractorProfile(companyName) {
   statusBadge.innerText = c['สถานะ'];
   statusBadge.className = 'status-badge ' + (c['สถานะ'] === 'ใช้งานอยู่' ? 'active' : 'inactive');
   
-  // 1. ดึงรายการอุปกรณ์ผ่านตรวจของเจ้านี้
+  // 1. คำนวณ Safety Scorecard สำหรับผู้รับเหมา (Normalized Compliance Rate %)
+  const scorecard = calculateContractorSafetyScore(companyName);
+
+  const gradeBadge = document.getElementById('vc-procurement-grade');
+  if (gradeBadge) {
+    gradeBadge.innerText = `${scorecard.gradeText} (${scorecard.finalScore}/100)`;
+    gradeBadge.className = `status-badge ${scorecard.badgeClass}`;
+    gradeBadge.onclick = function() { openScoreFormulaModal(companyName); };
+  }
+
+  const elPassRate = document.getElementById('vc-pass-rate');
+  if (elPassRate) elPassRate.innerText = `${scorecard.passRate}%`;
+  const elTotalDefects = document.getElementById('vc-total-defects');
+  if (elTotalDefects) elTotalDefects.innerText = `${scorecard.totalDefects} เคส (-${scorecard.pointsDeducted} แต้ม)`;
+  const elCapaRate = document.getElementById('vc-capa-rate');
+  if (elCapaRate) elCapaRate.innerText = `${scorecard.capaRate}%`;
+  const elDefectiveEq = document.getElementById('vc-defective-eq');
+  if (elDefectiveEq) elDefectiveEq.innerText = `${scorecard.defectiveEq} ชิ้น`;
+
+  // 2. ดึงรายการอุปกรณ์ผ่านตรวจของเจ้านี้
   const eqList = appState.equipment.filter(eq => eq['บริษัทผู้รับเหมา'] === companyName);
   const eqTbody = document.getElementById('vc-equipment-list');
   eqTbody.innerHTML = eqList.length > 0 
@@ -1185,8 +1585,7 @@ function openContractorProfile(companyName) {
       }).join('')
     : '<tr><td colspan="4" style="text-align: center; color: #aaa;">ไม่มีอุปกรณ์ลงทะเบียนอยู่ในปัจจุบัน</td></tr>';
     
-  // 2. ดึงประวัติทำผิดทั้งหมดสะสมย้อนหลัง
-  const violations = appState.patrolLogs.filter(log => log['ผู้รับเหมา'] === companyName);
+  // 3. ดึงประวัติทำผิดทั้งหมดสะสมย้อนหลัง
   const violationsTbody = document.getElementById('vc-patrol-list');
   violationsTbody.innerHTML = violations.length > 0
     ? violations.map(log => {
@@ -1327,14 +1726,29 @@ function printStickerTag(eqId) {
 }
 
 // --- แผนกสรุปตัวเลขและวาดกราฟสถิติหน้าแรก (Dashboard Charts & KPIs) ---
+function renderDashboard() {
+  updateDashboardKpis();
+  renderDashboardCharts();
+}
+
 function updateDashboardKpis() {
+  const selectedSite = document.getElementById('dashboard-site-filter')?.value || 'ALL';
+  
+  let filteredEquipment = appState.equipment || [];
+  let filteredPatrols = appState.patrolLogs || [];
+
+  if (selectedSite !== 'ALL') {
+    filteredEquipment = filteredEquipment.filter(e => e['Site โรงงาน'] === selectedSite || e['Site'] === selectedSite || e['โรงงาน'] === selectedSite);
+    filteredPatrols = filteredPatrols.filter(p => p['Site โรงงาน'] === selectedSite || p['Site'] === selectedSite || p['โรงงาน'] === selectedSite || p['พื้นที่']?.includes(selectedSite));
+  }
+
   document.getElementById('kpi-contractors').innerText = appState.contractors.filter(c => c['สถานะ'] === 'ใช้งานอยู่').length;
   
   // คำนวณอุปกรณ์ที่ปกติ (ป้ายเขียว) และหมดอายุ/ชำรุด (ป้ายแดง/เหลือง)
   let passedCount = 0;
   let defectiveOrExpiredCount = 0;
   
-  appState.equipment.forEach(e => {
+  filteredEquipment.forEach(e => {
     const isExpired = checkEquipmentExpired(e['วันหมดอายุ Tag']);
     const isDefective = checkEquipmentDefective(e['หมายเลขซีเรียล']);
     if (isExpired || isDefective) {
@@ -1348,10 +1762,10 @@ function updateDashboardKpis() {
   document.getElementById('kpi-defective-eq').innerText = defectiveOrExpiredCount;
   
   // บันทึกข้อบกพร่องจากการเดินตรวจสะสม
-  document.getElementById('kpi-total-findings').innerText = appState.patrolLogs.length;
+  document.getElementById('kpi-total-findings').innerText = filteredPatrols.length;
   
   // เคสรอดำเนินการ (Pending CAPA)
-  document.getElementById('kpi-pending-capa').innerText = appState.patrolLogs.filter(l => l['สถานะ CAPA'] === 'รอดำเนินการ CAPA').length;
+  document.getElementById('kpi-pending-capa').innerText = filteredPatrols.filter(l => l['สถานะ CAPA'] === 'รอดำเนินการ CAPA').length;
 }
 
 function renderDashboardCharts() {
@@ -1360,6 +1774,13 @@ function renderDashboardCharts() {
   const ctxZones = document.getElementById('chart-zones');
   
   if (!ctxContractors) return; // เช็กหากอยู่หน้าโมดูลอื่นยังไม่โหลดกราฟ
+
+  const selectedSite = document.getElementById('dashboard-site-filter')?.value || 'ALL';
+  let filteredPatrols = appState.patrolLogs || [];
+
+  if (selectedSite !== 'ALL') {
+    filteredPatrols = filteredPatrols.filter(p => p['Site โรงงาน'] === selectedSite || p['Site'] === selectedSite || p['โรงงาน'] === selectedSite || p['พื้นที่']?.includes(selectedSite));
+  }
   
   // กำหนดสีกราฟตามโหมดสว่าง/มืด
   const isDark = document.body.classList.contains('dark-theme');
@@ -1373,7 +1794,7 @@ function renderDashboardCharts() {
   
   // 1. ข้อมูลข้อบกพร่องสะสมแยกตามบริษัทผู้รับเหมา
   const contractorCounts = {};
-  appState.patrolLogs.forEach(log => {
+  filteredPatrols.forEach(log => {
     contractorCounts[log['ผู้รับเหมา']] = (contractorCounts[log['ผู้รับเหมา']] || 0) + 1;
   });
   
@@ -1417,7 +1838,7 @@ function renderDashboardCharts() {
   
   // 2. ข้อมูลสัดส่วนระดับความรุนแรง (สูง-กลาง-ต่ำ)
   let highCount = 0, medCount = 0, lowCount = 0;
-  appState.patrolLogs.forEach(log => {
+  filteredPatrols.forEach(log => {
     if (log['ระดับความรุนแรง'] === 'สูง') highCount++;
     else if (log['ระดับความรุนแรง'] === 'กลาง') medCount++;
     else lowCount++;
@@ -1447,7 +1868,7 @@ function renderDashboardCharts() {
   
   // 3. ข้อมูลข้อบกพร่องตามพื้นที่ปฏิบัติงาน
   const zoneCounts = {};
-  appState.patrolLogs.forEach(log => {
+  filteredPatrols.forEach(log => {
     zoneCounts[log['พื้นที่']] = (zoneCounts[log['พื้นที่']] || 0) + 1;
   });
   
@@ -1596,18 +2017,19 @@ function generateReportPreview() {
   const end = dateEnd ? new Date(dateEnd) : null;
   if (end) end.setHours(23,59,59,999); // ปรับหมดเวลาวันสุดท้าย
   
-  // --- แบบรายงานที่ B: คะแนนประเมินผู้รับเหมา ---
+  // --- แบบรายงานที่ B: รายงานสรุปคะแนนประเมินผู้รับเหมา (Safety Scorecard) ---
   if (reportType === 'evaluation') {
-    title.innerText = 'ตัวอย่างตารางรายงาน: รายงานสรุปคะแนนประเมินผู้รับเหมา (Contractor Safety Summary)';
+    title.innerText = 'รายงานสรุปคะแนนประเมินผู้รับเหมา (Safety Scorecard)';
     thead.innerHTML = `
       <tr>
         <th>ชื่อบริษัทผู้รับเหมา</th>
-        <th>ข้อบกพร่องรายเดือน</th>
-        <th>อัตราปิดเคสรายเดือน (%)</th>
-        <th>ข้อบกพร่องสะสมทั้งหมด</th>
-        <th>อัตราปิดเคสสะสมทั้งหมด (%)</th>
-        <th>อุปกรณ์ผ่านการตรวจ (ชิ้น)</th>
+        <th>คะแนนคงเหลือ (เต็ม 100)</th>
+        <th>หักคะแนนสะสม (แต้ม)</th>
+        <th>ข้อบกพร่องสะสม (เคส)</th>
+        <th>อัตราปิดเคส CAPA (%)</th>
+        <th>อุปกรณ์ผ่านตรวจ (ชิ้น)</th>
         <th>อุปกรณ์ชำรุด/ไม่ผ่าน (ชิ้น)</th>
+        <th>เกรดประเมินสรุป</th>
       </tr>
     `;
     
@@ -1615,53 +2037,24 @@ function generateReportPreview() {
     const listToRender = contractor ? appState.contractors.filter(c => c['ชื่อบริษัท'] === contractor) : appState.contractors;
     
     if (listToRender.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: #aaa;">ไม่พบข้อมูลบริษัท</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; color: #aaa;">ไม่พบข้อมูลบริษัท</td></tr>';
       return;
     }
     
     listToRender.forEach(c => {
       const name = c['ชื่อบริษัท'];
-      
-      // กรองเคสตรวจทั้งหมดของเจ้านี้
-      const companyLogs = appState.patrolLogs.filter(log => log['ผู้รับเหมา'] === name);
-      
-      // กรองเคสตามช่วงเวลา (รายเดือน)
-      const monthlyLogs = companyLogs.filter(log => {
-        const logDate = new Date(log['วันที่']);
-        return (!start || logDate >= start) && (!end || logDate <= end);
-      });
-      
-      // คำนวณรายเดือน
-      const monthlyTotal = monthlyLogs.length;
-      const monthlyClosed = monthlyLogs.filter(l => l['สถานะ CAPA'] === 'ปิดเคสแล้ว').length;
-      const monthlyRate = monthlyTotal > 0 ? Math.round((monthlyClosed / monthlyTotal) * 100) : 100;
-      
-      // คำนวณสะสมรวมทั้งหมด
-      const totalCount = companyLogs.length;
-      const totalClosed = companyLogs.filter(l => l['สถานะ CAPA'] === 'ปิดเคสแล้ว').length;
-      const totalRate = totalCount > 0 ? Math.round((totalClosed / totalCount) * 100) : 100;
-      
-      // คำนวณจำนวนอุปกรณ์
-      const compEq = appState.equipment.filter(eq => eq['บริษัทผู้รับเหมา'] === name);
-      let passedEq = 0;
-      let defectiveEq = 0;
-      compEq.forEach(eq => {
-        if (checkEquipmentExpired(eq['วันหมดอายุ Tag']) || checkEquipmentDefective(eq['หมายเลขซีเรียล'])) {
-          defectiveEq++;
-        } else {
-          passedEq++;
-        }
-      });
-      
+      const scorecard = calculateContractorSafetyScore(name);
+
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td style="font-weight: 600;">${name}</td>
-        <td>${monthlyTotal} เคส</td>
-        <td><strong style="color: ${monthlyRate === 100 ? 'var(--success-color)' : 'var(--warning-color)'}">${monthlyRate}%</strong></td>
-        <td>${totalCount} เคส</td>
-        <td><strong style="color: ${totalRate === 100 ? 'var(--success-color)' : 'var(--warning-color)'}">${totalRate}%</strong></td>
-        <td><span style="color: var(--success-color); font-weight:600;">${passedEq}</span></td>
-        <td><span style="color: ${defectiveEq > 0 ? 'var(--danger-color)' : '#999'}; font-weight:600;">${defectiveEq}</span></td>
+        <td><strong style="font-size: 15px; color: ${scorecard.finalScore >= 80 ? 'var(--success-color)' : (scorecard.finalScore >= 60 ? 'var(--warning-color)' : 'var(--danger-color)')}">${scorecard.finalScore} คะแนน</strong></td>
+        <td><span style="color: var(--danger-color); font-weight:600;">-${scorecard.pointsDeducted}</span></td>
+        <td>${scorecard.totalDefects} เคส</td>
+        <td><strong style="color: ${scorecard.capaRate === 100 ? 'var(--success-color)' : 'var(--warning-color)'}">${scorecard.capaRate}%</strong></td>
+        <td><span style="color: var(--success-color); font-weight:600;">${scorecard.passedEq}</span></td>
+        <td><span style="color: ${scorecard.defectiveEq > 0 ? 'var(--danger-color)' : '#999'}; font-weight:600;">${scorecard.defectiveEq}</span></td>
+        <td><span class="status-badge ${scorecard.badgeClass}" onclick="openScoreFormulaModal('${name}')" style="cursor: pointer;" title="คลิกเพื่อดูรายละเอียดและสูตรคำนวณคะแนนฉบับเต็ม">${scorecard.gradeText} <i class="fa-solid fa-calculator" style="font-size: 10px; margin-left: 2px;"></i></span></td>
       `;
       tbody.appendChild(tr);
     });
@@ -1669,7 +2062,7 @@ function generateReportPreview() {
   
   // --- แบบรายงานที่ C: รายการตรวจสอบอุปกรณ์ทั้งหมด ---
   else if (reportType === 'equipment') {
-    title.innerText = 'ตัวอย่างตารางรายงาน: รายการตรวจสอบอุปกรณ์ผู้รับเหมาทั้งหมด';
+    title.innerText = 'รายงานตรวจสอบอุปกรณ์ผู้รับเหมาทั้งหมด';
     thead.innerHTML = `
       <tr>
         <th>ชื่ออุปกรณ์</th>
@@ -1725,7 +2118,7 @@ function generateReportPreview() {
   
   // --- แบบรายงานที่ A: รายละเอียดการเดินตรวจความปลอดภัย ---
   else if (reportType === 'patrol') {
-    title.innerText = 'ตัวอย่างตารางรายงาน: ประวัติเดินตรวจความปลอดภัยและใบงาน CAPA';
+    title.innerText = 'รายงานรายละเอียดการเดินตรวจความปลอดภัยและใบงาน CAPA';
     thead.innerHTML = `
       <tr>
         <th>วันที่ตรวจ</th>
@@ -1771,7 +2164,7 @@ function generateReportPreview() {
   
   // --- แบบรายงานที่ D: ยอดตรวจสอบอุปกรณ์เครื่องมือประจำวัน ---
   else if (reportType === 'audit') {
-    title.innerText = 'ตัวอย่างตารางรายงาน: รายงานสถิติยอดส่งตรวจอุปกรณ์ช่างประจำวัน (Daily Audit Logs)';
+    title.innerText = 'รายงานสถิติยอดส่งตรวจอุปกรณ์ช่างประจำวัน (Daily Audit Logs)';
     thead.innerHTML = `
       <tr>
         <th>วันที่ตรวจ</th>
@@ -1819,7 +2212,7 @@ function generateReportPreview() {
   
   // --- แบบรายงานที่ E: ยอดตรวจสอบและขึ้นทะเบียน PPE สะสม ---
   else if (reportType === 'ppe') {
-    title.innerText = 'ตัวอย่างตารางรายงาน: รายงานตรวจสอบและขึ้นทะเบียนอุปกรณ์ป้องกันภัยส่วนบุคคล (PPE Inspection Logs)';
+    title.innerText = 'รายงานตรวจสอบและขึ้นทะเบียนอุปกรณ์ป้องกันภัยส่วนบุคคล (PPE Inspection Logs)';
     thead.innerHTML = `
       <tr>
         <th>วันที่ตรวจ</th>
@@ -2812,15 +3205,33 @@ async function saveDailyAudit(e) {
 // ส่งรายงานรวมแบบสะสม (Digest Email) และแจ้งเตือน Telegram
 async function sendPatrolDigest() {
   // กรองหาข้อบกพร่องที่ค้างส่งในแคชหน้าเว็บ เพื่อแจ้งเตือนยืนยันผู้ใช้งาน
-  const unsentCount = appState.patrolLogs.filter(log => log['สถานะการส่งอีเมล'] !== 'ส่งแล้ว').length;
+  const unsentLogs = appState.patrolLogs.filter(log => log['สถานะการส่งอีเมล'] !== 'ส่งแล้ว');
+  const unsentCount = unsentLogs.length;
   
   if (unsentCount === 0) {
     alert('ไม่มีรายงานความปลอดภัยใหม่ที่ยังไม่ได้ส่งในรอบนี้ครับ');
     return;
   }
   
-  if (!confirm(`มีข้อมูลข้อบกพร่องความปลอดภัยใหม่สะสมรอจัดส่งอยู่ทั้งหมด ${unsentCount} รายการ\nต้องการส่งจดหมายสรุปรายงานแยกตามแผนกเจ้าของพื้นที่ และยิงแจ้งเตือนแผนกความปลอดภัยผ่าน Telegram ตอนนี้เลยใช่หรือไม่?`)) {
-    return;
+  // ค้นหาชื่อ จป. ที่มีรายงานค้างส่ง
+  const inspectorsWithUnsent = [...new Set(unsentLogs.map(log => log['ผู้ตรวจสอบ'] || log['ผู้ตรวจบันทึก']).filter(Boolean))];
+  
+  let targetInspector = 'ทั้งหมด';
+  if (inspectorsWithUnsent.length > 1) {
+    const choices = inspectorsWithUnsent.join(', ');
+    const input = prompt(`พบลายเซ็น จป. ที่มีงานค้างส่งดังนี้: ${choices}\n\nกรุณาพิมพ์ชื่อ จป. ที่ต้องการส่งรายงานสรุป (หรือพิมพ์ "ทั้งหมด" เพื่อส่งของทุกคนพร้อมกัน):`, 'ทั้งหมด');
+    if (input === null) return; // กดยกเลิก
+    if (input.trim()) {
+      targetInspector = input.trim();
+    }
+  } else if (inspectorsWithUnsent.length === 1) {
+    const confirmSend = confirm(`พบรายงานความปลอดภัยของ จป. "${inspectorsWithUnsent[0]}" ค้างอยู่จำนวน ${unsentCount} รายการ\nต้องการจัดส่งอีเมลและส่งข้อมูลเข้ากลุ่ม Telegram ตอนนี้เลยใช่หรือไม่?`);
+    if (!confirmSend) return;
+    targetInspector = inspectorsWithUnsent[0];
+  } else {
+    if (!confirm(`มีข้อมูลข้อบกพร่องความปลอดภัยใหม่สะสมรอจัดส่งอยู่ทั้งหมด ${unsentCount} รายการ\nต้องการส่งจดหมายสรุปรายงานแยกตามแผนกเจ้าของพื้นที่ และยิงแจ้งเตือนแผนกความปลอดภัยผ่าน Telegram ตอนนี้เลยใช่หรือไม่?`)) {
+      return;
+    }
   }
   
   showConnectionStatus('loading');
@@ -2831,7 +3242,10 @@ async function sendPatrolDigest() {
         method: 'POST',
         mode: 'no-cors',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'sendPatrolDigest' })
+        body: JSON.stringify({ 
+          action: 'sendPatrolDigest',
+          inspector: targetInspector
+        })
       });
       
       alert('ส่งรายงานสรุปแจ้งเตือนแบบ Digest และยิงแจ้งเตือนผ่าน Telegram สำเร็จแล้วครับ!');
@@ -2931,6 +3345,8 @@ function startQrScan(targetInputId) {
           
           if (targetInputId === 'dashboard-lookup-serial') {
             lookupEquipmentStatus(serial);
+          } else if (targetInputId === 'renew-search-input') {
+            searchEquipmentForRenewal();
           } else {
             alert('สแกนพบคิวอาร์ซีเรียลอุปกรณ์: ' + serial);
           }
@@ -3439,6 +3855,334 @@ function checkUrlParamsForLookup() {
       lookupEquipmentStatus(serialParam);
     }, 400);
   }
+}
+
+// --- ระบบการบีบอัดรูปภาพก่อนอัปโหลดด้วย HTML5 Canvas ---
+function compressImage(file, maxWidth = 1024, quality = 0.75, callback) {
+  if (!file || !file.type || !file.type.startsWith('image/')) {
+    const reader = new FileReader();
+    reader.onload = e => callback(e.target.result);
+    reader.readAsDataURL(file);
+    return;
+  }
+  const reader = new FileReader();
+  reader.readAsDataURL(file);
+  reader.onload = function(event) {
+    const img = new Image();
+    img.src = event.target.result;
+    img.onload = function() {
+      let width = img.width;
+      let height = img.height;
+      if (width > maxWidth) {
+        height = Math.round((height * maxWidth) / width);
+        width = maxWidth;
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, width, height);
+      const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+      callback(compressedDataUrl);
+    };
+    img.onerror = function() {
+      callback(event.target.result);
+    };
+  };
+}
+
+// --- ระบบการจัดการลบข้อมูลด้วย PIN และศูนย์ควบคุม Admin ---
+function openAdminDeleteModal() {
+  openModal('admin-delete-modal');
+}
+
+function openPinModal(actionType, targetId) {
+  document.getElementById('pin-action-type').value = actionType;
+  document.getElementById('pin-target-id').value = targetId;
+  document.getElementById('pin-input').value = '';
+  document.getElementById('pin-reason').value = '';
+  
+  const inspectorSelect = document.getElementById('pin-inspector-select');
+  if (inspectorSelect) {
+    if (actionType === 'deletePatrolLog') {
+      inspectorSelect.value = 'ADMIN';
+      Array.from(inspectorSelect.options).forEach(opt => {
+        if (opt.value !== 'ADMIN' && opt.value !== '') {
+          opt.disabled = true;
+        } else {
+          opt.disabled = false;
+        }
+      });
+    } else {
+      inspectorSelect.value = '';
+      Array.from(inspectorSelect.options).forEach(opt => {
+        opt.disabled = false;
+      });
+    }
+  }
+  
+  onPinUserSelectChange();
+  openModal('pin-modal');
+}
+
+function onPinUserSelectChange() {
+  const selected = document.getElementById('pin-inspector-select').value;
+  const pinInput = document.getElementById('pin-input');
+  if (pinInput) {
+    pinInput.placeholder = selected === 'ADMIN' ? 'ป้อนรหัส Admin PIN' : 'ป้อนรหัส PIN 4 หลัก';
+    pinInput.focus();
+  }
+}
+
+async function submitPinDelete(e) {
+  e.preventDefault();
+  const actionType = document.getElementById('pin-action-type').value;
+  const targetId = document.getElementById('pin-target-id').value;
+  const inspector = document.getElementById('pin-inspector-select').value;
+  const typedPin = document.getElementById('pin-input').value.trim();
+  const reason = document.getElementById('pin-reason').value.trim();
+
+  if (!inspector) {
+    alert('กรุณาเลือก จป. ผู้ตรวจ หรือ Admin ผู้ดำเนินการ');
+    return;
+  }
+  if (!typedPin) {
+    alert('กรุณากรอกรหัส PIN');
+    return;
+  }
+
+  // กำหนดสิทธิ์: หากเป็นการลบข้อมูลการเดินตรวจ (deletePatrolLog) บังคับสิทธิ์ ADMIN PIN เท่านั้น
+  if (actionType === 'deletePatrolLog' && inspector !== 'ADMIN') {
+    alert('⛔ การลบประวัติการเดินตรวจความปลอดภัย อนุญาตเฉพาะสิทธิ์ ADMIN PIN เท่านั้นครับ');
+    return;
+  }
+
+  // ยืนยันตรวจสอบรหัส PIN
+  let isPinValid = false;
+  if (inspector === 'ADMIN') {
+    const adminPin = appState.adminPin || '9999';
+    isPinValid = (typedPin === adminPin);
+  } else {
+    const expectedPin = appState.inspectorPins ? appState.inspectorPins[inspector] : null;
+    if (expectedPin) {
+      isPinValid = (typedPin === expectedPin);
+    } else {
+      isPinValid = (typedPin === '9999' || typedPin === '1234');
+    }
+  }
+
+  if (!isPinValid) {
+    alert('❌ รหัส PIN ไม่ถูกต้อง! กรุณาตรวจสอบรหัส PIN ของท่านอีกครั้ง');
+    return;
+  }
+
+  closeModal('pin-modal');
+  showConnectionStatus('loading');
+
+  const payload = {
+    targetId: targetId,
+    inspector: inspector,
+    reason: reason || 'ลบผ่านระบบ PIN (Admin Control)',
+    pin: typedPin
+  };
+
+  const success = await sendActionToServer(actionType, payload);
+  if (success) {
+    alert('✅ ลบข้อมูลประวัติการเดินตรวจและรูปภาพถาวรเรียบร้อยแล้ว (บันทึก AuditLogs สำเร็จ)');
+  } else {
+    alert('⚠️ ทำการลบในระบบเครื่องเรียบร้อย (ออฟไลน์)');
+  }
+}
+
+function triggerBulkDelete(type) {
+  if (type === 'equipment') {
+    const checkboxes = document.querySelectorAll('.eq-row-checkbox:checked');
+    if (checkboxes.length === 0) {
+      alert('กรุณาเลือกรายการอุปกรณ์อย่างน้อย 1 รายการเพื่อทำการลบ');
+      return;
+    }
+    const ids = Array.from(checkboxes).map(cb => cb.value).join(',');
+    openPinModal('bulkDeleteEquipment', ids);
+  }
+}
+
+// ----------------- DEDICATED JORPOR TAG RENEWAL SYSTEM -----------------
+let currentRenewalEquipment = null;
+
+function openRenewTagModal() {
+  const input = document.getElementById('renew-search-input');
+  const card = document.getElementById('renew-target-card');
+  const select = document.getElementById('renew-select-equipment');
+
+  if (input) input.value = '';
+  if (card) card.style.display = 'none';
+  currentRenewalEquipment = null;
+
+  // เติม รายชื่ออุปกรณ์ลง Dropdown สำหรับผู้ใช้ PC / Notebook
+  if (select) {
+    select.innerHTML = '<option value="">-- เลือกอุปกรณ์ในระบบ หรือป้อนซีเรียลค้นหาด้านล่าง --</option>';
+    (appState.equipment || []).forEach(eq => {
+      const isDefective = checkEquipmentDefective(eq['หมายเลขซีเรียล']);
+      const isExpired = checkEquipmentExpired(eq['วันหมดอายุ Tag']);
+      const statusLabel = isDefective ? ' [ชำรุด]' : (isExpired ? ' [หมดอายุ]' : ' [ปกติ]');
+      
+      const opt = document.createElement('option');
+      opt.value = eq['ID'] || eq['หมายเลขซีเรียล'];
+      opt.text = `${eq['ชื่ออุปกรณ์']} (ซีเรียล: ${eq['หมายเลขซีเรียล']}) - ${eq['บริษัทผู้รับเหมา']}${statusLabel}`;
+      select.appendChild(opt);
+    });
+  }
+
+  openModal('renew-tag-modal');
+}
+
+function onRenewSelectChange() {
+  const selectVal = document.getElementById('renew-select-equipment')?.value;
+  if (!selectVal) {
+    document.getElementById('renew-target-card').style.display = 'none';
+    currentRenewalEquipment = null;
+    return;
+  }
+  displayEquipmentInRenewalCard(selectVal);
+}
+
+function searchEquipmentForRenewal() {
+  const query = (document.getElementById('renew-search-input')?.value || '').trim();
+  if (!query) {
+    alert('กรุณาป้อนหมายเลขซีเรียล หรือรหัส ID อุปกรณ์ก่อนค้นหาครับ');
+    return;
+  }
+  displayEquipmentInRenewalCard(query);
+}
+
+function displayEquipmentInRenewalCard(queryOrId) {
+  const eq = (appState.equipment || []).find(item => 
+    (item['หมายเลขซีเรียล'] !== undefined && String(item['หมายเลขซีเรียล']).trim() === String(queryOrId).trim()) || 
+    (item['ID'] !== undefined && String(item['ID']).trim().toLowerCase() === String(queryOrId).trim().toLowerCase())
+  );
+
+  if (!eq) {
+    alert(`❌ ไม่พบข้อมูลการขึ้นทะเบียนอุปกรณ์สำหรับ "${queryOrId}" ในระบบครับ`);
+    const card = document.getElementById('renew-target-card');
+    if (card) card.style.display = 'none';
+    currentRenewalEquipment = null;
+    return;
+  }
+
+  currentRenewalEquipment = eq;
+
+  const isExpired = checkEquipmentExpired(eq['วันหมดอายุ Tag']);
+  const isDefective = checkEquipmentDefective(eq['หมายเลขซีเรียล']);
+
+  const statusSpan = document.getElementById('renew-current-status');
+  if (statusSpan) {
+    if (isDefective) {
+      statusSpan.className = 'status-badge inactive';
+      statusSpan.innerText = 'อุปกรณ์ชำรุด / ห้ามใช้งาน';
+    } else if (isExpired) {
+      statusSpan.className = 'status-badge pending';
+      statusSpan.innerText = 'หมดอายุ Tag (ต้องต่ออายุ)';
+    } else {
+      statusSpan.className = 'status-badge active';
+      statusSpan.innerText = 'ปกติ (ใช้งานปลอดภัย)';
+    }
+  }
+
+  const today = new Date();
+  const expiryDate = new Date(today);
+  expiryDate.setDate(today.getDate() + 30);
+  
+  const expiryIso = expiryDate.toISOString().split('T')[0];
+  const monthColorObj = MONTHLY_COLORS[today.getMonth()];
+  const colorName = monthColorObj ? monthColorObj.name : '-';
+
+  document.getElementById('renew-eq-name').innerText = eq['ชื่ออุปกรณ์'] || '-';
+  document.getElementById('renew-eq-serial').innerText = eq['หมายเลขซีเรียล'] || '-';
+  document.getElementById('renew-eq-contractor').innerText = eq['บริษัทผู้รับเหมา'] || '-';
+  document.getElementById('renew-old-expiry').innerText = formatThaiDate(eq['วันหมดอายุ Tag']);
+  document.getElementById('renew-new-expiry').innerText = formatThaiDate(expiryIso);
+  document.getElementById('renew-new-color').innerText = colorName;
+
+  const card = document.getElementById('renew-target-card');
+  if (card) card.style.display = 'flex';
+}
+
+async function executeEquipmentRenewal() {
+  if (!currentRenewalEquipment) return;
+  await renewEquipmentTag(currentRenewalEquipment['ID'] || currentRenewalEquipment['หมายเลขซีเรียล']);
+  closeModal('renew-tag-modal');
+}
+
+function reportEquipmentDefectFromRenewal() {
+  if (!currentRenewalEquipment) return;
+  const serial = currentRenewalEquipment['หมายเลขซีเรียล'] || currentRenewalEquipment['ID'];
+  const contractor = currentRenewalEquipment['บริษัทผู้รับเหมา'];
+  closeModal('renew-tag-modal');
+  openMarkDefectiveModal(serial, contractor);
+}
+
+function openMarkDefectiveModal(serial, contractorName) {
+  openModal('add-patrol-modal');
+  
+  const contractorSelect = document.getElementById('p-contractor');
+  const qrInput = document.getElementById('p-qr-scan');
+
+  if (contractorName && contractorSelect) {
+    contractorSelect.value = contractorName;
+  }
+  if (serial && qrInput) {
+    qrInput.value = serial;
+  }
+}
+
+async function renewEquipmentTag(idOrSerial) {
+  if (!idOrSerial) return;
+
+  const eq = (appState.equipment || []).find(item => 
+    String(item['ID'] || '').trim() === String(idOrSerial).trim() || 
+    String(item['หมายเลขซีเรียล'] || '').trim() === String(idOrSerial).trim()
+  );
+
+  if (!eq) {
+    alert(`❌ ไม่พบข้อมูลอุปกรณ์รหัส/ซีเรียล "${idOrSerial}" ในระบบครับ`);
+    return;
+  }
+
+  const confirmRenew = confirm(`🔄 ยืนยันการต่ออายุป้าย Tag 30 วันสำหรับอุปกรณ์:\n----------------------------------\n• ชื่ออุปกรณ์: ${eq['ชื่ออุปกรณ์']}\n• หมายเลขซีเรียล: ${eq['หมายเลขซีเรียล']}\n• บริษัทผู้รับเหมา: ${eq['บริษัทผู้รับเหมา']}\n\nระบบจะทำการอัปเดตวันที่ตรวจเป็นวันนี้ และขยายวันหมดอายุไปอีก 30 วันโดยใช้รหัส ID (${eq['ID']}) เดิมครับ`);
+  if (!confirmRenew) return;
+
+  const today = new Date();
+  const todayIso = today.toISOString().split('T')[0];
+  
+  const expiryDate = new Date(today);
+  expiryDate.setDate(today.getDate() + 30);
+  const expiryIso = expiryDate.toISOString().split('T')[0];
+
+  const monthColorObj = MONTHLY_COLORS[today.getMonth()];
+  const colorName = monthColorObj ? monthColorObj.name : 'ไม่ได้ระบุ';
+
+  eq['วันที่ตรวจสอบ'] = todayIso;
+  eq['วันหมดอายุ Tag'] = expiryIso;
+  eq['สีป้ายประจำเดือน'] = colorName;
+
+  const payload = {
+    id: eq['ID'],
+    serialNumber: eq['หมายเลขซีเรียล'],
+    equipmentName: eq['ชื่ออุปกรณ์'],
+    contractor: eq['บริษัทผู้รับเหมา'],
+    site: eq['Site โรงงาน'] || eq['Site'] || eq['โรงงาน'] || '',
+    inspectionDate: todayIso,
+    expiryDate: expiryIso,
+    monthlyColor: colorName
+  };
+
+  showConnectionStatus('loading');
+  await sendActionToServer('updateEquipmentExpiry', payload);
+  
+  renderEquipmentTable();
+  if (appState.equipment) renderDashboard();
+
+  alert(`✅ ต่ออายุป้าย Tag เรียบร้อยแล้ว!\n---------------------------\nชื่ออุปกรณ์: ${eq['ชื่ออุปกรณ์']}\nหมายเลขซีเรียล: ${eq['หมายเลขซีเรียล']}\nวันหมดอายุใหม่: ${formatThaiDate(expiryIso)}\nสีป้ายประจำเดือนใหม่: ${colorName}`);
 }
 
 

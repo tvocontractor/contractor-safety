@@ -403,6 +403,8 @@ body {
 .btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  text-align: center;
   gap: 8px;
   padding: 10px 20px;
   font-size: 14px;
@@ -592,6 +594,11 @@ tr:hover td {
   display: flex;
   justify-content: flex-end;
   gap: 12px;
+}
+
+.modal-footer.justify-center,
+.modal-footer:has(> button:only-child) {
+  justify-content: center;
 }
 
 /* Form Styles */
