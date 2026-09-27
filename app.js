@@ -1258,14 +1258,18 @@ function renderEquipmentTable() {
     list = list.filter(e => e['Site โรงงาน'] === siteFilter || e['Site'] === siteFilter || e['โรงงาน'] === siteFilter);
   }
 
-  // กรองตามสถานะอุปกรณ์ (ปกติ, ชำรุด, หมดอายุ, ทั้งหมด)
+  // กรองตามสถานะอุปกรณ์ (ปกติ, ชำรุด, หมดอายุ, ปิดการใช้งาน, ทั้งหมด)
   if (statusFilter !== 'ALL') {
     list = list.filter(e => {
+      const statusVal = String(e['สถานะอุปกรณ์'] || e['สถานะ'] || '').trim();
+      const isDeactivated = statusVal.indexOf('ปิดการใช้งาน') > -1 || statusVal.indexOf('จบโครงการ') > -1 || statusVal.indexOf('ปลดระวาง') > -1;
       const isExpired = checkEquipmentExpired(e['วันหมดอายุ Tag']);
       const isDefective = checkEquipmentDefective(e['หมายเลขซีเรียล']);
-      if (statusFilter === 'ปกติ') return !isExpired && !isDefective;
-      if (statusFilter === 'ชำรุด') return isDefective;
-      if (statusFilter === 'หมดอายุ') return isExpired;
+      
+      if (statusFilter === 'ปกติ') return !isDeactivated && !isExpired && !isDefective;
+      if (statusFilter === 'ปิดการใช้งาน' || statusFilter === 'ปิดใช้งาน') return isDeactivated;
+      if (statusFilter === 'ชำรุด') return isDefective && !isDeactivated;
+      if (statusFilter === 'หมดอายุ') return isExpired && !isDeactivated;
       return true;
     });
   }
@@ -3792,11 +3796,17 @@ function lookupEquipmentStatus(serial) {
     return;
   }
   
-  // ตรวจสอบสถานะการหมดอายุ 30 วัน หรือชำรุด (มี CAPA)
+  // ตรวจสอบสถานะการปิดใช้งาน, หมดอายุ 30 วัน หรือชำรุด (มี CAPA)
+  const statusVal = String(eq['สถานะอุปกรณ์'] || eq['สถานะ'] || '').trim();
+  const isDeactivated = statusVal.indexOf('ปิดการใช้งาน') > -1 || statusVal.indexOf('จบโครงการ') > -1 || statusVal.indexOf('ปลดระวาง') > -1;
   const isExpired = checkEquipmentExpired(eq['วันหมดอายุ Tag']);
   const isDefective = checkEquipmentDefective(eq['หมายเลขซีเรียล']);
   
-  if (isDefective) {
+  if (isDeactivated) {
+    badgeContainer.style.backgroundColor = '#f1f5f9';
+    badgeContainer.style.color = '#475569';
+    badgeContainer.innerHTML = '<i class="fa-solid fa-power-off"></i> ปิดการใช้งานอุปกรณ์ (จบโครงการ) / DEACTIVATED';
+  } else if (isDefective) {
     badgeContainer.style.backgroundColor = '#fff3e0';
     badgeContainer.style.color = '#e65100';
     badgeContainer.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> ตรวจพบข้อบกพร่องหน้างาน (อุปกรณ์ชำรุด) / DEFECTIVE';
@@ -3828,8 +3838,8 @@ function lookupEquipmentStatus(serial) {
   contractorSpan.innerText = eq['บริษัทผู้รับเหมา'];
   dateSpan.innerText = formatThaiDate(eq['วันที่ตรวจสอบ']);
   
-  const statusText = isExpired ? ' (หมดอายุแล้ว)' : (isDefective ? ' (อุปกรณ์ชำรุด)' : ' (ปกติ)');
-  expirySpan.innerHTML = `<span style="color: ${isExpired || isDefective ? 'var(--danger-color)' : 'var(--success-color)'}; font-weight: bold;">${formatThaiDate(eq['วันหมดอายุ Tag'])}${statusText}</span>`;
+  const statusText = isDeactivated ? ' (ปิดการใช้งาน - จบโครงการ)' : (isExpired ? ' (หมดอายุแล้ว)' : (isDefective ? ' (อุปกรณ์ชำรุด)' : ' (ปกติ)'));
+  expirySpan.innerHTML = `<span style="color: ${isDeactivated ? '#64748b' : (isExpired || isDefective ? 'var(--danger-color)' : 'var(--success-color)')}; font-weight: bold;">${formatThaiDate(eq['วันหมดอายุ Tag'])}${statusText}</span>`;
   
   const colorHex = getColorHexFromMonthName(eq['สีป้ายประจำเดือน']) || '#ccc';
   colorSpan.innerHTML = `<span class="color-dot" style="background-color: ${colorHex}; display: inline-block; vertical-align: middle; margin-right: 4px;"></span> ${eq['สีป้ายประจำเดือน'] || 'ไม่ได้ระบุ'}`;
@@ -3840,7 +3850,7 @@ function lookupEquipmentStatus(serial) {
   openModal('equipment-lookup-modal');
   
   // แจ้งเตือนสถานะทันทีทาง Pop-up
-  const statusStr = isDefective ? '❌ อุปกรณ์ชำรุด (มีเคสความปลอดภัยคงค้าง)' : (isExpired ? '⚠️ หมดอายุการตรวจแล้ว' : '✅ ปกติ (ใช้งานปลอดภัย)');
+  const statusStr = isDeactivated ? '🛑 ปิดการใช้งาน (จบโครงการ / นำออกจากพื้นที่แล้ว)' : (isDefective ? '❌ อุปกรณ์ชำรุด (มีเคสความปลอดภัยคงค้าง)' : (isExpired ? '⚠️ หมดอายุการตรวจแล้ว' : '✅ ปกติ (ใช้งานปลอดภัย)'));
   alert(`📢 ตรวจสอบสถานะอุปกรณ์:\n---------------------------\nชื่ออุปกรณ์: ${eq['ชื่ออุปกรณ์']}\nหมายเลขซีเรียล: ${eq['หมายเลขซีเรียล']}\nบริษัทผู้รับเหมา: ${eq['บริษัทผู้รับเหมา']}\nสถานะ: ${statusStr}\nวันหมดอายุ Tag: ${formatThaiDate(eq['วันหมดอายุ Tag'])}`);
 }
 
