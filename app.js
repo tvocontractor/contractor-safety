@@ -986,6 +986,33 @@ async function saveContractor(e) {
   }
 }
 
+// 1.5 เปิด Modal ขึ้นทะเบียนใหม่อัตโนมัติ (Pre-fill สำหรับอุปกรณ์ที่หมดอายุ)
+function quickReRegisterEquipment(serial, name, contractor, site, area) {
+  openModal('add-equipment-modal');
+  
+  if (name && document.getElementById('eq-name')) document.getElementById('eq-name').value = name;
+  if (serial && document.getElementById('eq-serial')) document.getElementById('eq-serial').value = serial;
+  if (contractor && document.getElementById('eq-contractor')) document.getElementById('eq-contractor').value = contractor;
+  if (site && document.getElementById('eq-site')) document.getElementById('eq-site').value = site;
+  if (area && document.getElementById('eq-area')) document.getElementById('eq-area').value = area;
+
+  const today = new Date();
+  const todayIso = today.toISOString().split('T')[0];
+  const expiryDate = new Date(today);
+  expiryDate.setDate(today.getDate() + 30);
+  const expiryIso = expiryDate.toISOString().split('T')[0];
+
+  if (document.getElementById('eq-date')) document.getElementById('eq-date').value = todayIso;
+  if (document.getElementById('eq-expiry')) document.getElementById('eq-expiry').value = expiryIso;
+  
+  const monthColorObj = MONTHLY_COLORS[today.getMonth()];
+  const colorName = monthColorObj ? monthColorObj.name : '-';
+  if (document.getElementById('eq-color-name')) document.getElementById('eq-color-name').innerText = colorName;
+  if (document.getElementById('eq-color-badge')) {
+    document.getElementById('eq-color-badge').style.backgroundColor = monthColorObj ? monthColorObj.color : '#666';
+  }
+}
+
 // 2. บันทึกเพิ่มอุปกรณ์
 async function saveEquipment(e) {
   e.preventDefault();
@@ -1312,6 +1339,25 @@ function renderEquipmentTable() {
       
     const siteVal = e['Site โรงงาน'] || e['Site'] || e['โรงงาน'] || 'โรงงาน 1';
 
+    let renewBtnHtml = '';
+    let mobileRenewBtnHtml = '';
+    
+    if (isExpired) {
+      renewBtnHtml = `<button class="btn btn-outline" style="padding: 4px 8px; font-size: 11px; border-color: #16a34a; color: #16a34a; background-color: #f0fdf4;" onclick="quickReRegisterEquipment('${(e['หมายเลขซีเรียล']||'').replace(/'/g, "\\'")}', '${(e['ชื่ออุปกรณ์']||'').replace(/'/g, "\\'")}', '${(e['บริษัทผู้รับเหมา']||'').replace(/'/g, "\\'")}', '${siteVal.replace(/'/g, "\\'")}', '${(e['สถานที่ใช้งาน / พื้นที่'] || e['สถานที่ใช้งาน'] || '').replace(/'/g, "\\'")}')" title="🔴 Tag หมดอายุการตรวจแล้ว (คลิกเพื่อขึ้นทะเบียนใหม่)">
+            <i class="fa-solid fa-file-signature"></i>
+          </button>`;
+      mobileRenewBtnHtml = `<button class="btn btn-outline" style="padding: 6px 10px; font-size: 11px; border-color: #16a34a; color: #16a34a; background-color: #f0fdf4;" onclick="quickReRegisterEquipment('${(e['หมายเลขซีเรียล']||'').replace(/'/g, "\\'")}', '${(e['ชื่ออุปกรณ์']||'').replace(/'/g, "\\'")}', '${(e['บริษัทผู้รับเหมา']||'').replace(/'/g, "\\'")}', '${siteVal.replace(/'/g, "\\'")}', '${(e['สถานที่ใช้งาน / พื้นที่'] || e['สถานที่ใช้งาน'] || '').replace(/'/g, "\\'")}')">
+          <i class="fa-solid fa-file-signature"></i> ขึ้นทะเบียนใหม่
+        </button>`;
+    } else {
+      renewBtnHtml = `<button class="btn btn-outline" style="padding: 4px 8px; font-size: 11px; border-color: var(--primary-color); color: var(--primary-color);" onclick="renewEquipmentTag('${e['ID'] || e['หมายเลขซีเรียล']}')" title="ต่ออายุป้าย Tag 30 วัน (สำหรับ จป.)">
+            <i class="fa-solid fa-arrows-rotate"></i>
+          </button>`;
+      mobileRenewBtnHtml = `<button class="btn btn-outline" style="padding: 6px 10px; font-size: 11px; border-color: var(--primary-color); color: var(--primary-color);" onclick="renewEquipmentTag('${e['ID'] || e['หมายเลขซีเรียล']}')">
+          <i class="fa-solid fa-arrows-rotate"></i> ต่ออายุ
+        </button>`;
+    }
+
     tr.innerHTML = `
       <td style="text-align: center;"><input type="checkbox" class="eq-row-checkbox" value="${e['ID']}" onchange="updateEqBulkPrintButtonVisibility()"></td>
       <td style="font-weight: 600;">
@@ -1333,9 +1379,7 @@ function renderEquipmentTable() {
       </td>
       <td>
         <div style="display: flex; gap: 4px;">
-          <button class="btn btn-outline" style="padding: 4px 8px; font-size: 11px; border-color: var(--primary-color); color: var(--primary-color);" onclick="renewEquipmentTag('${e['ID'] || e['หมายเลขซีเรียล']}')" title="ต่ออายุป้าย Tag 30 วัน (สำหรับ จป.)">
-            <i class="fa-solid fa-arrows-rotate"></i>
-          </button>
+          ${renewBtnHtml}
           <button class="btn btn-outline" style="padding: 4px 8px; font-size: 11px; border-color: #64748b; color: #64748b;" onclick="deactivateEquipmentStatus('${e['ID'] || e['หมายเลขซีเรียล']}')" title="ปิดการใช้งาน / จบโครงการ">
             <i class="fa-solid fa-power-off"></i>
           </button>
@@ -1363,9 +1407,7 @@ function renderEquipmentTable() {
         <strong>ป้ายสี:</strong> <span class="color-dot" style="background-color: ${colorHex};"></span> ${e['สีป้ายประจำเดือน']}
       </div>
       <div style="display: flex; justify-content: space-between; gap: 4px; border-top: 1px solid #eee; padding-top: 8px; flex-wrap: wrap;">
-        <button class="btn btn-outline" style="padding: 6px 10px; font-size: 11px; border-color: var(--primary-color); color: var(--primary-color);" onclick="renewEquipmentTag('${e['ID'] || e['หมายเลขซีเรียล']}')">
-          <i class="fa-solid fa-arrows-rotate"></i> ต่ออายุ
-        </button>
+        ${mobileRenewBtnHtml}
         <button class="btn btn-outline" style="padding: 6px 10px; font-size: 11px; border-color: #64748b; color: #64748b;" onclick="deactivateEquipmentStatus('${e['ID'] || e['หมายเลขซีเรียล']}')">
           <i class="fa-solid fa-power-off"></i> ปิดใช้งาน
         </button>
@@ -4067,10 +4109,14 @@ function openRenewTagModal() {
   if (card) card.style.display = 'none';
   currentRenewalEquipment = null;
 
-  // เติม รายชื่ออุปกรณ์ลง Dropdown สำหรับผู้ใช้ PC / Notebook
+  // เติม รายชื่ออุปกรณ์ลง Dropdown สำหรับผู้ใช้ PC / Notebook (ยกเว้นอุปกรณ์ที่ปิดการใช้งานไปแล้ว)
   if (select) {
     select.innerHTML = '<option value="">-- เลือกอุปกรณ์ในระบบ หรือป้อนซีเรียลค้นหาด้านล่าง --</option>';
     (appState.equipment || []).forEach(eq => {
+      const statusVal = String(eq['สถานะอุปกรณ์'] || eq['สถานะ'] || '').trim();
+      const isDeactivated = statusVal.indexOf('ปิดการใช้งาน') > -1 || statusVal.indexOf('จบโครงการ') > -1 || statusVal.indexOf('ปลดระวาง') > -1;
+      if (isDeactivated) return; // ไม่นำอุปกรณ์ที่ปิดการใช้งาน (จบโครงการ) มาแสดงใน Dropdown ต่ออายุ
+
       const isDefective = checkEquipmentDefective(eq['หมายเลขซีเรียล']);
       const isExpired = checkEquipmentExpired(eq['วันหมดอายุ Tag']);
       const statusLabel = isDefective ? ' [ชำรุด]' : (isExpired ? ' [หมดอายุ]' : ' [ปกติ]');
@@ -4120,20 +4166,47 @@ function displayEquipmentInRenewalCard(queryOrId) {
 
   currentRenewalEquipment = eq;
 
+  const statusVal = String(eq['สถานะอุปกรณ์'] || eq['สถานะ'] || '').trim();
+  const isDeactivated = statusVal.indexOf('ปิดการใช้งาน') > -1 || statusVal.indexOf('จบโครงการ') > -1 || statusVal.indexOf('ปลดระวาง') > -1;
   const isExpired = checkEquipmentExpired(eq['วันหมดอายุ Tag']);
   const isDefective = checkEquipmentDefective(eq['หมายเลขซีเรียล']);
 
   const statusSpan = document.getElementById('renew-current-status');
+  const btnConfirmRenew = document.getElementById('btn-confirm-renew');
+
   if (statusSpan) {
-    if (isDefective) {
+    if (isDeactivated) {
+      statusSpan.className = 'status-badge inactive';
+      statusSpan.innerText = 'ปิดการใช้งาน (จบโครงการ) - ห้ามต่ออายุ';
+      if (btnConfirmRenew) {
+        btnConfirmRenew.disabled = true;
+        btnConfirmRenew.style.opacity = '0.5';
+        btnConfirmRenew.title = 'อุปกรณ์ถูกปิดการใช้งานแล้ว ไม่สามารถกดต่ออายุได้ ต้องขึ้นทะเบียนใหม่เท่านั้น';
+      }
+    } else if (isDefective) {
       statusSpan.className = 'status-badge inactive';
       statusSpan.innerText = 'อุปกรณ์ชำรุด / ห้ามใช้งาน';
+      if (btnConfirmRenew) {
+        btnConfirmRenew.disabled = false;
+        btnConfirmRenew.style.opacity = '1';
+        btnConfirmRenew.title = '';
+      }
     } else if (isExpired) {
-      statusSpan.className = 'status-badge pending';
-      statusSpan.innerText = 'หมดอายุ Tag (ต้องต่ออายุ)';
+      statusSpan.className = 'status-badge inactive';
+      statusSpan.innerText = '🔴 หมดอายุ Tag เกินกำหนด (ห้ามต่ออายุ - ต้องขึ้นทะเบียนใหม่)';
+      if (btnConfirmRenew) {
+        btnConfirmRenew.disabled = true;
+        btnConfirmRenew.style.opacity = '0.5';
+        btnConfirmRenew.title = 'อุปกรณ์ปล่อยให้ Tag หมดอายุแล้ว ไม่อนุญาตให้กดต่ออายุย้อนหลังได้ ต้องขึ้นทะเบียนใหม่เพื่อออกป้ายใหม่เท่านั้น';
+      }
     } else {
       statusSpan.className = 'status-badge active';
       statusSpan.innerText = 'ปกติ (ใช้งานปลอดภัย)';
+      if (btnConfirmRenew) {
+        btnConfirmRenew.disabled = false;
+        btnConfirmRenew.style.opacity = '1';
+        btnConfirmRenew.title = '';
+      }
     }
   }
 
@@ -4197,7 +4270,22 @@ async function renewEquipmentTag(idOrSerial) {
     return;
   }
 
-  // บล็อกการต่ออายุหากอุปกรณ์ชิ้นนี้ยังมีเคส CAPA ความปลอดภัยค้างอยู่
+  // 1. บล็อกการต่ออายุหากอุปกรณ์มีสถานะเป็น 'ปิดการใช้งาน (จบโครงการ)'
+  const statusVal = String(eq['สถานะอุปกรณ์'] || eq['สถานะ'] || '').trim();
+  const isDeactivated = statusVal.indexOf('ปิดการใช้งาน') > -1 || statusVal.indexOf('จบโครงการ') > -1 || statusVal.indexOf('ปลดระวาง') > -1;
+
+  if (isDeactivated) {
+    alert(`⛔ ไม่สามารถต่ออายุป้าย Tag ได้!
+----------------------------------
+ชื่ออุปกรณ์: ${eq['ชื่ออุปกรณ์']} (ซีเรียล: ${eq['หมายเลขซีเรียล']})
+สถานะปัจจุบัน: ปิดการใช้งาน (จบโครงการ)
+
+💡 อุปกรณ์ที่ถูกปิดการใช้งาน (จบโครงการ) ไปแล้ว ไม่อนุญาตให้กดต่ออายุได้ครับ
+หากต้องการนำอุปกรณ์ชิ้นนี้กลับมาปฏิบัติงานใหม่ กรุณาไปที่เมนู "ขึ้นทะเบียนอุปกรณ์" เพื่อสร้างทะเบียนสติกเกอร์ใบใหม่ครับ`);
+    return;
+  }
+
+  // 2. บล็อกการต่ออายุหากอุปกรณ์ชิ้นนี้ยังมีเคส CAPA ความปลอดภัยค้างอยู่
   const targetSerial = eq['หมายเลขซีเรียล'] || eq['ID'];
   const hasPendingCapa = checkEquipmentDefective(targetSerial);
 
@@ -4208,6 +4296,24 @@ async function renewEquipmentTag(idOrSerial) {
 สาเหตุ: อุปกรณ์ชิ้นนี้ยังมีเคสข้อบกพร่องความปลอดภัยคงค้างอยู่ (รอดำเนินการ CAPA)
 
 💡 กรุณาติดตามการแนบรูปแก้ไข (After) เพื่อปิดเคส CAPA ในเมนูเดินตรวจความปลอดภัยก่อนทำการต่ออายุครับ`);
+    return;
+  }
+
+  // 3. บล็อกการต่ออายุหากป้าย Tag หมดอายุเกินกำหนดแล้ว (Overdue Renewal Blocking)
+  const isExpired = checkEquipmentExpired(eq['วันหมดอายุ Tag']);
+  if (isExpired) {
+    alert(`⛔ ไม่สามารถต่ออายุป้าย Tag ได้! (หมดอายุเกินกำหนด)
+----------------------------------
+ชื่ออุปกรณ์: ${eq['ชื่ออุปกรณ์']} (ซีเรียล: ${eq['หมายเลขซีเรียล']})
+วันหมดอายุเดิม: ${formatThaiDate(eq['วันหมดอายุ Tag'])}
+สถานะปัจจุบัน: 🔴 หมดอายุการตรวจ
+
+💡 ป้าย Tag ของอุปกรณ์ชิ้นนี้หมดอายุแล้ว ไม่อนุญาตให้กดต่ออายุย้อนหลังได้ครับ
+เพื่อรักษาประวัติการหักคะแนนประเมินด้านความปลอดภัยประจำปี (-5 คะแนน)
+
+📌 สิ่งที่ต้องทำ:
+1. ให้ปิดการใช้งานรายการอุปกรณ์เดิม
+2. นำอุปกรณ์ไปกด "ขึ้นทะเบียนอุปกรณ์" ใหม่ เพื่อออกสติกเกอร์และรหัส Tag ใบใหม่สำหรับนำกลับมาใช้งานครับ`);
     return;
   }
 
@@ -4263,7 +4369,15 @@ async function deactivateEquipmentStatus(idOrSerial) {
     return;
   }
 
-  const confirmDeactivate = confirm(`🛑 ยืนยันการปิดการใช้งานอุปกรณ์ (จบโครงการ / ปลดระวาง):\n----------------------------------\n• ชื่ออุปกรณ์: ${eq['ชื่ออุปกรณ์']}\n• หมายเลขซีเรียล: ${eq['หมายเลขซีเรียล']}\n• บริษัทผู้รับเหมา: ${eq['บริษัทผู้รับเหมา']}\n\n💡 หมายเหตุ: อุปกรณ์ที่ปิดการใช้งานแล้ว จะไม่ถูกนำไปหักคะแนนป้าย Tag หมดอายุ (-5 แต้ม) ในรายงานการประเมินความปลอดภัยผู้รับเหมาประจำปีครับ`);
+  const targetSerial = eq['หมายเลขซีเรียล'] || eq['ID'];
+  const hasPendingCapa = checkEquipmentDefective(targetSerial);
+
+  let warningNote = '';
+  if (hasPendingCapa) {
+    warningNote = `\n\n⚠️ คำเตือนสำคัญ: อุปกรณ์ชิ้นนี้ยังมีเคสข้อบกพร่องความปลอดภัยคงค้างอยู่ (รอดำเนินการ CAPA)\nระบบจะบันทึกสถานะเป็น "ปิดการใช้งาน (จบโครงการ)" เพื่อหยุดการหักคะแนน Tag Expired แต่ประวัติ CAPA จะยังคงล็อคซีเรียล (${targetSerial}) นี้ไว้ จนกว่าจะมีการอัปโหลดภาพ After ปิดเคส CAPA จริงก่อนจะนำกลับมาขึ้นทะเบียนใหม่ได้ในอนาคตครับ`;
+  }
+
+  const confirmDeactivate = confirm(`🛑 ยืนยันการปิดการใช้งานอุปกรณ์ (จบโครงการ / ปลดระวาง):\n----------------------------------\n• ชื่ออุปกรณ์: ${eq['ชื่ออุปกรณ์']}\n• หมายเลขซีเรียล: ${eq['หมายเลขซีเรียล']}\n• บริษัทผู้รับเหมา: ${eq['บริษัทผู้รับเหมา']}${warningNote}\n\nต้องการเปลี่ยนสถานะเป็น "ปิดการใช้งาน (จบโครงการ)" หรือไม่?`);
   if (!confirmDeactivate) return;
 
   eq['สถานะอุปกรณ์'] = 'ปิดการใช้งาน (จบโครงการ)';
@@ -4283,7 +4397,11 @@ async function deactivateEquipmentStatus(idOrSerial) {
   renderEquipmentTable();
   if (appState.equipment) renderDashboard();
 
-  alert(`✅ เปลี่ยนสถานะเป็น "ปิดการใช้งาน (จบโครงการ)" เรียบร้อยแล้ว!\n---------------------------\nชื่ออุปกรณ์: ${eq['ชื่ออุปกรณ์']}\nหมายเลขซีเรียล: ${eq['หมายเลขซีเรียล']}\n\nคะแนนประเมิน Safety Scorecard ของผู้รับเหมาจะได้รับการยกเว้นการหักคะแนน Tag หมดอายุสำหรับอุปกรณ์ชิ้นนี้แล้วครับ`);
+  if (hasPendingCapa) {
+    alert(`⚠️ เปลี่ยนสถานะเป็น "ปิดการใช้งาน (จบโครงการ)" เรียบร้อยแล้ว!\n---------------------------\nชื่ออุปกรณ์: ${eq['ชื่ออุปกรณ์']}\nหมายเลขซีเรียล: ${eq['หมายเลขซีเรียล']}\n\n📌 หมายเหตุ: อุปกรณ์นี้ยังมีเคส CAPA คงค้างอยู่ หากผู้รับเหมานำซีเรียลนี้กลับมาขึ้นทะเบียนใหม่ในอนาคต ระบบจะบล็อกและบังคับให้ปิดเคส CAPA เดิมก่อนครับ`);
+  } else {
+    alert(`✅ เปลี่ยนสถานะเป็น "ปิดการใช้งาน (จบโครงการ)" เรียบร้อยแล้ว!\n---------------------------\nชื่ออุปกรณ์: ${eq['ชื่ออุปกรณ์']}\nหมายเลขซีเรียล: ${eq['หมายเลขซีเรียล']}\n\nคะแนนประเมิน Safety Scorecard ของผู้รับเหมาจะได้รับการยกเว้นการหักคะแนน Tag หมดอายุสำหรับอุปกรณ์ชิ้นนี้แล้วครับ`);
+  }
 }
 
 
